@@ -47,7 +47,7 @@ export default async function MyTasksPage() {
         <h1 className="text-white text-2xl font-bold">My Tasks</h1>
         <p className="text-gray-500 text-sm mt-0.5">Your assigned tasks across all active events</p>
       </div>
-      <MyTasksView tasks={tasks} userId={user.id} userRole={profile.role} />
+      <MyTasksView tasks={tasks as any[]} userId={user.id} userRole={profile.role} />
     </div>
   )
 }

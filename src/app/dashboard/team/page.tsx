@@ -27,7 +27,7 @@ export default async function TeamPage() {
       </div>
 
       {/* Team Load View */}
-      <TeamLoadView team={team || []} activeEvents={activeEvents || []} />
+      <TeamLoadView team={team || []} activeEvents={(activeEvents || []) as any[]} />
 
       <div className="mt-8 mb-4">
         <h2 className="text-white font-semibold">Manage Team</h2>
