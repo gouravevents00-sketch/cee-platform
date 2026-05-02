@@ -31,7 +31,7 @@ export default async function CalendarPage() {
           <p className="text-gray-500 text-xs mt-0.5">All events by date</p>
         </div>
       </div>
-      <CalendarView events={events || []} />
+      <CalendarView events={(events || []) as any[]} />
     </div>
   )
 }
