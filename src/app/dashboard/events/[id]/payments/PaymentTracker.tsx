@@ -8,6 +8,7 @@ import { Plus, CheckCircle2, Clock, AlertCircle, IndianRupee, ArrowDownCircle, A
 interface ClientPayment {
   id: string
   type: 'advance' | 'milestone' | 'final'
+  label?: string
   amount: number
   due_date?: string
   received_date?: string
@@ -22,6 +23,7 @@ interface VendorPayment {
   due_date?: string
   paid_date?: string
   status: 'pending' | 'paid' | 'overdue'
+  label?: string
   notes?: string
   vendors?: { name: string; category?: string }
 }
@@ -45,7 +47,7 @@ export default function PaymentTracker({ eventId, payments, vendorPayments, vend
   const [showClientForm, setShowClientForm] = useState(false)
   const [showVendorForm, setShowVendorForm] = useState(false)
   const [clientForm, setClientForm] = useState({ type: 'advance', amount: '', due_date: '', notes: '' })
-  const [vendorForm, setVendorForm] = useState({ vendor_id: '', amount: '', due_date: '', notes: '' })
+  const [vendorForm, setVendorForm] = useState({ vendor_id: '', label: '', amount: '', due_date: '', notes: '' })
   const [loading, setLoading] = useState(false)
   const [marking, setMarking] = useState<string | null>(null)
   const router = useRouter()
@@ -80,12 +82,13 @@ export default function PaymentTracker({ eventId, payments, vendorPayments, vend
     await supabase.from('vendor_payments').insert({
       event_id: eventId,
       vendor_id: vendorForm.vendor_id,
+      label: vendorForm.label || null,
       amount: parseFloat(vendorForm.amount),
       due_date: vendorForm.due_date || null,
       notes: vendorForm.notes || null,
       status: 'pending',
     })
-    setVendorForm({ vendor_id: '', amount: '', due_date: '', notes: '' })
+    setVendorForm({ vendor_id: '', label: '', amount: '', due_date: '', notes: '' })
     setShowVendorForm(false)
     router.refresh()
     setLoading(false)
@@ -203,6 +206,7 @@ export default function PaymentTracker({ eventId, payments, vendorPayments, vend
                   key={p.id}
                   title={p.type}
                   badge={CLIENT_TYPE_COLORS[p.type]}
+                  subtitle={p.label}
                   amount={p.amount}
                   status={p.status}
                   statusColor={p.status === 'received' ? 'text-green-400' : p.status === 'overdue' ? 'text-red-400' : 'text-gray-400'}
@@ -224,23 +228,41 @@ export default function PaymentTracker({ eventId, payments, vendorPayments, vend
       {/* VENDOR PAYMENTS TAB */}
       {tab === 'vendor' && (
         <div>
+          {/* Decoupling notice — always visible */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 mb-4 flex items-start gap-3">
+            <span className="text-amber-500 mt-0.5 text-lg">⚡</span>
+            <div>
+              <p className="text-gray-300 text-xs font-semibold">Vendor payments are director-controlled</p>
+              <p className="text-gray-500 text-xs mt-0.5">
+                Pay vendors whenever funds are available — completely independent of client receipts.
+                Late client payment or re-allocation of funds does not affect this.
+              </p>
+            </div>
+          </div>
+
           {isDirector && (
             <div className="flex justify-end mb-4">
               <button onClick={() => setShowVendorForm(!showVendorForm)} className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-black font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors">
-                <Plus size={16} /> Add Vendor Payment
+                <Plus size={16} /> Pay Vendor
               </button>
             </div>
           )}
 
           {showVendorForm && (
             <form onSubmit={addVendorPayment} className="bg-gray-900 border border-amber-700/40 rounded-2xl p-5 mb-4 space-y-3">
-              <h3 className="text-white font-semibold text-sm">New Vendor Payment</h3>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Vendor *</label>
-                <select value={vendorForm.vendor_id} onChange={e => setVendorForm(f => ({ ...f, vendor_id: e.target.value }))} required className={inputClass}>
-                  <option value="">Select vendor...</option>
-                  {vendors.map(v => <option key={v.id} value={v.id}>{v.name}{v.category ? ` (${v.category})` : ''}</option>)}
-                </select>
+              <h3 className="text-white font-semibold text-sm">Pay Vendor</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Vendor *</label>
+                  <select value={vendorForm.vendor_id} onChange={e => setVendorForm(f => ({ ...f, vendor_id: e.target.value }))} required className={inputClass}>
+                    <option value="">Select vendor...</option>
+                    {vendors.map(v => <option key={v.id} value={v.id}>{v.name}{v.category ? ` (${v.category})` : ''}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Payment For</label>
+                  <input type="text" value={vendorForm.label} onChange={e => setVendorForm(f => ({ ...f, label: e.target.value }))} placeholder="e.g. Advance for printing" className={inputClass} />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -248,13 +270,13 @@ export default function PaymentTracker({ eventId, payments, vendorPayments, vend
                   <input type="number" value={vendorForm.amount} onChange={e => setVendorForm(f => ({ ...f, amount: e.target.value }))} required placeholder="0" className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Due Date</label>
+                  <label className="block text-xs text-gray-500 mb-1">Date (leave blank if future)</label>
                   <input type="date" value={vendorForm.due_date} onChange={e => setVendorForm(f => ({ ...f, due_date: e.target.value }))} className={inputClass} />
                 </div>
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Notes</label>
-                <input type="text" value={vendorForm.notes} onChange={e => setVendorForm(f => ({ ...f, notes: e.target.value }))} placeholder="e.g. Advance for printing" className={inputClass} />
+                <input type="text" value={vendorForm.notes} onChange={e => setVendorForm(f => ({ ...f, notes: e.target.value }))} placeholder="Internal reference, mode of payment, etc." className={inputClass} />
               </div>
               <div className="flex gap-2">
                 <button type="button" onClick={() => setShowVendorForm(false)} className="flex-1 bg-gray-800 text-gray-400 rounded-xl py-2.5 text-sm">Cancel</button>
@@ -273,6 +295,7 @@ export default function PaymentTracker({ eventId, payments, vendorPayments, vend
                   title={p.vendors?.name || 'Unknown Vendor'}
                   badge="bg-gray-800 text-gray-400"
                   badgeText={p.vendors?.category}
+                  subtitle={p.label}
                   amount={p.amount}
                   status={p.status}
                   statusColor={p.status === 'paid' ? 'text-green-400' : p.status === 'overdue' ? 'text-red-400' : 'text-gray-400'}
@@ -307,8 +330,8 @@ function EmptyState({ icon, text }: { icon: React.ReactNode, text: string }) {
   )
 }
 
-function PaymentCard({ title, badge, badgeText, amount, status, statusColor, date, notes, actions }: {
-  title: string, badge: string, badgeText?: string, amount: number,
+function PaymentCard({ title, badge, badgeText, subtitle, amount, status, statusColor, date, notes, actions }: {
+  title: string, badge: string, badgeText?: string, subtitle?: string, amount: number,
   status: string, statusColor: string, date?: string, notes?: string,
   actions?: React.ReactNode
 }) {
@@ -327,7 +350,8 @@ function PaymentCard({ title, badge, badgeText, amount, status, statusColor, dat
             <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${badge}`}>{badgeText || title}</span>
             <span className={`text-xs capitalize ${statusColor}`}>{status}</span>
           </div>
-          {date && <p className="text-gray-500 text-xs mt-1">{date}</p>}
+          {subtitle && <p className="text-gray-400 text-xs mt-1 font-medium">{subtitle}</p>}
+          {date && <p className="text-gray-500 text-xs mt-0.5">{date}</p>}
           {notes && <p className="text-gray-600 text-xs mt-0.5">{notes}</p>}
         </div>
         {actions && <div className="flex-shrink-0">{actions}</div>}

@@ -20,6 +20,7 @@ interface Element {
   poc_owner?: string
   notes?: string
   vendors?: { name: string }
+  from_quotation?: boolean   // set when auto-generated from locked quotation
 }
 
 interface TeamMember {
@@ -61,6 +62,7 @@ export default function ElementSheet({ eventId, elements, vendors, teamMembers, 
   const [deleting, setDeleting] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState<string | null>(null)
+  const [replacingVendor, setReplacingVendor] = useState<string | null>(null)   // element id being replaced
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -156,6 +158,14 @@ export default function ElementSheet({ eventId, elements, vendors, teamMembers, 
 
   async function updateAssignee(id: string, poc_owner: string) {
     await supabase.from('elements').update({ poc_owner: poc_owner || null }).eq('id', id)
+    router.refresh()
+  }
+
+  async function replaceVendor(elementId: string, newVendorId: string) {
+    await supabase.from('elements').update({
+      vendor_id: newVendorId || null,
+    }).eq('id', elementId)
+    setReplacingVendor(null)
     router.refresh()
   }
 
@@ -356,7 +366,30 @@ export default function ElementSheet({ eventId, elements, vendors, teamMembers, 
               ) : (
                 <>
                   <span className="text-gray-400 text-xs">{el.material || '—'}</span>
-                  <span className="text-gray-400 text-xs">{el.vendors?.name || '—'}</span>
+                  {/* Vendor cell — director can replace inline */}
+                  <div className="text-xs">
+                    {isDirector && replacingVendor === el.id ? (
+                      <div className="flex items-center gap-1">
+                        <select
+                          autoFocus
+                          defaultValue={el.vendor_id || ''}
+                          onChange={e => replaceVendor(el.id, e.target.value)}
+                          className="bg-gray-800 border border-amber-500 rounded text-xs text-gray-300 focus:outline-none py-0.5 pr-1 max-w-[140px]">
+                          <option value="">— No vendor —</option>
+                          {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                        </select>
+                        <button onClick={() => setReplacingVendor(null)} className="text-gray-600 hover:text-white text-xs">✕</button>
+                      </div>
+                    ) : (
+                      <span
+                        className={`text-gray-400 ${isDirector ? 'cursor-pointer hover:text-amber-400 transition-colors' : ''}`}
+                        onClick={() => isDirector && setReplacingVendor(el.id)}
+                        title={isDirector ? 'Click to replace vendor' : undefined}>
+                        {el.vendors?.name || <span className="text-gray-600 italic">No vendor</span>}
+                        {isDirector && <span className="text-gray-700 ml-1 text-[10px]">✎</span>}
+                      </span>
+                    )}
+                  </div>
                 </>
               )}
 
