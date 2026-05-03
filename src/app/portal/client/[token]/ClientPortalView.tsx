@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { CalendarDays, MapPin, CheckCircle2, Clock, AlertCircle, IndianRupee, FileImage, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react'
+import { CalendarDays, MapPin, CheckCircle2, Clock, AlertCircle, IndianRupee, FileImage, MessageSquare, ChevronDown, ChevronUp, Plus } from 'lucide-react'
 
 interface Props {
   event: any
@@ -24,11 +24,29 @@ export default function ClientPortalView({ event, elements, payments, approvals,
   const [deciding, setDeciding] = useState<string | null>(null)
   const [comments, setComments] = useState<Record<string, string>>({})
   const [decided, setDecided] = useState<Record<string, 'approved' | 'changes'>>({})
+  const [showRequestForm, setShowRequestForm] = useState(false)
+  const [reqForm, setReqForm] = useState({ name: '', specs: '', quantity: '1', notes: '' })
+  const [reqLoading, setReqLoading] = useState(false)
+  const [reqSent, setReqSent] = useState(false)
 
   const progress = Math.round((event.current_phase / 7) * 100)
   const totalExpected = payments.reduce((s: number, p: any) => s + p.amount, 0)
   const totalReceived = payments.filter((p: any) => p.status === 'received').reduce((s: number, p: any) => s + p.amount, 0)
   const pendingApprovals = approvals.filter(a => a.status === 'pending' && !decided[a.id])
+
+  async function submitElementRequest() {
+    if (!reqForm.name.trim()) return
+    setReqLoading(true)
+    await fetch('/api/portal/client/request-element', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, ...reqForm, quantity: parseInt(reqForm.quantity) || 1 }),
+    })
+    setReqSent(true)
+    setReqLoading(false)
+    setShowRequestForm(false)
+    setReqForm({ name: '', specs: '', quantity: '1', notes: '' })
+  }
 
   async function submitDecision(approvalId: string, decision: 'approved' | 'changes') {
     setDeciding(approvalId)
@@ -235,6 +253,69 @@ export default function ClientPortalView({ event, elements, payments, approvals,
           )}
         </div>
       )}
+
+      {/* Request Additional Element */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-white font-semibold text-sm">Request Additional Element</h2>
+          {reqSent && <span className="text-green-400 text-xs">Request sent ✓</span>}
+        </div>
+        <p className="text-gray-500 text-xs mb-4">Want something added to your event? Let us know and we'll review it.</p>
+
+        {!showRequestForm ? (
+          <button
+            onClick={() => setShowRequestForm(true)}
+            className="flex items-center gap-2 text-amber-400 hover:text-amber-300 text-sm transition-colors"
+          >
+            <Plus size={15} /> Add Request
+          </button>
+        ) : (
+          <div className="space-y-3">
+            <input
+              value={reqForm.name}
+              onChange={e => setReqForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="Element name *"
+              className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-500 placeholder-gray-600"
+            />
+            <input
+              value={reqForm.specs}
+              onChange={e => setReqForm(f => ({ ...f, specs: e.target.value }))}
+              placeholder="Specifications / description"
+              className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-500 placeholder-gray-600"
+            />
+            <input
+              type="number"
+              value={reqForm.quantity}
+              onChange={e => setReqForm(f => ({ ...f, quantity: e.target.value }))}
+              min="1"
+              placeholder="Quantity"
+              className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-500"
+            />
+            <textarea
+              value={reqForm.notes}
+              onChange={e => setReqForm(f => ({ ...f, notes: e.target.value }))}
+              placeholder="Any additional notes or reference..."
+              rows={2}
+              className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-500 resize-none placeholder-gray-600"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowRequestForm(false)}
+                className="flex-1 bg-gray-800 text-gray-400 rounded-xl py-2.5 text-sm hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitElementRequest}
+                disabled={!reqForm.name.trim() || reqLoading}
+                className="flex-1 bg-amber-500 text-black font-semibold rounded-xl py-2.5 text-sm disabled:opacity-50 hover:bg-amber-400 transition-colors"
+              >
+                {reqLoading ? 'Sending...' : 'Send Request'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Footer */}
       <p className="text-gray-700 text-xs text-center py-2">

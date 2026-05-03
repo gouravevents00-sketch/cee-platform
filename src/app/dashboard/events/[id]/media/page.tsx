@@ -19,11 +19,19 @@ export default async function EventMediaPage({ params }: { params: Promise<{ id:
   if (profile.role === 'poc' && event.poc_id !== user.id) redirect('/dashboard')
   if (profile.role === 'accounts') redirect('/dashboard')
 
-  const { data: mediaItems } = await supabase
-    .from('event_media')
-    .select('*, uploader:profiles!event_media_uploaded_by_fkey(id, name, role)')
-    .eq('event_id', id)
-    .order('created_at', { ascending: false })
+  const [{ data: mediaItems }, { data: elements }] = await Promise.all([
+    supabase
+      .from('event_media')
+      .select('*, uploader:profiles!event_media_uploaded_by_fkey(id, name, role)')
+      .eq('event_id', id)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('elements')
+      .select('id, name')
+      .eq('event_id', id)
+      .neq('status', 'cancelled')
+      .order('name'),
+  ])
 
   const canUpload = ['director', 'admin', 'poc'].includes(profile.role)
   const canApprove = ['director', 'admin', 'design'].includes(profile.role)
@@ -43,6 +51,7 @@ export default async function EventMediaPage({ params }: { params: Promise<{ id:
       <MediaView
         eventId={id}
         mediaItems={(mediaItems || []) as any[]}
+        elements={(elements || []) as { id: string; name: string }[]}
         canUpload={canUpload}
         canApprove={canApprove}
         currentUserId={user.id}

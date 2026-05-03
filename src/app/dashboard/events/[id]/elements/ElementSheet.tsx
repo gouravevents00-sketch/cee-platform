@@ -22,10 +22,20 @@ interface Element {
   vendors?: { name: string }
 }
 
+interface TeamMember {
+  id: string
+  role_in_event: string
+  department: string
+  is_freelancer: boolean
+  freelancer_name?: string
+  member?: { id: string; name: string }
+}
+
 interface Props {
   eventId: string
   elements: Element[]
   vendors: { id: string; name: string; category?: string }[]
+  teamMembers: TeamMember[]
   userRole: string
   userId: string
   showCosts: boolean
@@ -44,7 +54,7 @@ const EMPTY_ROW = {
   vendor_id: '', vendor_rate: '', client_rate: '', poc_owner: '', notes: '',
 }
 
-export default function ElementSheet({ eventId, elements, vendors, userRole, userId, showCosts, isDirector }: Props) {
+export default function ElementSheet({ eventId, elements, vendors, teamMembers, userRole, userId, showCosts, isDirector }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(EMPTY_ROW)
   const [loading, setLoading] = useState(false)
@@ -144,6 +154,16 @@ export default function ElementSheet({ eventId, elements, vendors, userRole, use
     router.refresh()
   }
 
+  async function updateAssignee(id: string, poc_owner: string) {
+    await supabase.from('elements').update({ poc_owner: poc_owner || null }).eq('id', id)
+    router.refresh()
+  }
+
+  const teamOptions = teamMembers.map(m => ({
+    value: m.is_freelancer ? (m.freelancer_name || '') : (m.member?.name || ''),
+    label: m.is_freelancer ? `${m.freelancer_name} (freelancer)` : (m.member?.name || ''),
+  })).filter(o => o.value)
+
   const totalClientValue = showCosts
     ? elements.filter(e => e.status !== 'cancelled').reduce((sum, e) => sum + ((e.client_rate || 0) * e.quantity), 0)
     : 0
@@ -238,8 +258,15 @@ export default function ElementSheet({ eventId, elements, vendors, userRole, use
               </select>
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">POC Owner</label>
-              <input type="text" value={form.poc_owner} onChange={e => set('poc_owner', e.target.value)} className={inputClass} placeholder="Who handles this?" />
+              <label className="block text-xs text-gray-500 mb-1">Assigned To</label>
+              {teamOptions.length > 0 ? (
+                <select value={form.poc_owner} onChange={e => set('poc_owner', e.target.value)} className={inputClass}>
+                  <option value="">Unassigned</option>
+                  {teamOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              ) : (
+                <input type="text" value={form.poc_owner} onChange={e => set('poc_owner', e.target.value)} className={inputClass} placeholder="Who handles this?" />
+              )}
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Vendor Rate (₹)</label>
@@ -297,7 +324,18 @@ export default function ElementSheet({ eventId, elements, vendors, userRole, use
               <div>
                 <p className="text-white font-medium">{el.name}</p>
                 {el.specs && <p className="text-gray-500 text-xs mt-0.5">{el.specs}</p>}
-                {el.poc_owner && <p className="text-gray-600 text-xs">{el.poc_owner}</p>}
+                {isDirector && teamOptions.length > 0 ? (
+                  <select
+                    value={el.poc_owner || ''}
+                    onChange={e => updateAssignee(el.id, e.target.value)}
+                    className="mt-0.5 bg-transparent text-xs text-gray-500 border-0 outline-none cursor-pointer hover:text-amber-400 transition-colors w-full max-w-[160px]"
+                  >
+                    <option value="">Unassigned</option>
+                    {teamOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                ) : (
+                  el.poc_owner && <p className="text-gray-600 text-xs">{el.poc_owner}</p>
+                )}
                 {el.notes && <p className="text-gray-600 text-xs italic">{el.notes}</p>}
               </div>
               <span className="text-gray-400 text-xs">{el.size || '—'}</span>

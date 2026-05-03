@@ -9,6 +9,8 @@ import ActivityLog from '@/components/ActivityLog'
 import ReviewRequest from '@/components/ReviewRequest'
 import PortalLinkGenerator from '@/components/PortalLinkGenerator'
 import SaveAsTemplate from '@/components/SaveAsTemplate'
+import EventDateEditor from '@/components/EventDateEditor'
+import EmergencyPOCReplace from '@/components/EmergencyPOCReplace'
 import Link from 'next/link'
 
 export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -51,6 +53,16 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   const canRequestApproval = ['poc', 'design', 'admin', 'accounts'].includes(profile.role)
   const currentPhase = PHASES[event.current_phase]
 
+  // Fetch POC profiles for emergency replacement (director only)
+  const { data: pocProfiles } = isDirector
+    ? await supabase.from('profiles').select('id, name').eq('role', 'poc').order('name')
+    : { data: [] }
+
+  // Check if event has team members (for date change impact warning)
+  const { count: teamCount } = isDirector
+    ? await supabase.from('event_team').select('id', { count: 'exact', head: true }).eq('event_id', id)
+    : { count: 0 }
+
   // Fetch vendors with elements for this event (for portal links)
   const { data: eventVendors } = isDirector ? await supabase
     .from('elements')
@@ -88,10 +100,31 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
                 <span className="flex items-center gap-1">
                   <CalendarDays size={13} />
                   {new Date(event.event_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  {isDirector && (
+                    <EventDateEditor
+                      eventId={id}
+                      currentDate={event.event_date}
+                      eventName={event.name}
+                      hasTeam={(teamCount || 0) > 0}
+                      hasVendors={uniqueVendors.length > 0}
+                    />
+                  )}
                 </span>
               )}
               {event.poc?.name && (
-                <span className="flex items-center gap-1"><User size={13} /> POC: {event.poc.name}</span>
+                <span className="flex items-center gap-1.5">
+                  <User size={13} />
+                  POC: {event.poc.name}
+                  {isDirector && (
+                    <EmergencyPOCReplace
+                      eventId={id}
+                      eventName={event.name}
+                      currentPOCName={event.poc.name}
+                      currentPOCId={event.poc_id}
+                      pocProfiles={(pocProfiles || []) as { id: string; name: string }[]}
+                    />
+                  )}
+                </span>
               )}
             </div>
           </div>

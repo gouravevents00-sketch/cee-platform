@@ -17,6 +17,7 @@ export default async function EventTeamPage({ params }: { params: Promise<{ id: 
   if (!event) notFound()
 
   if (profile.role === 'poc' && event.poc_id !== user.id) redirect('/dashboard')
+  if (profile.role === 'design' || profile.role === 'accounts') redirect(`/dashboard/events/${id}`)
 
   const [{ data: teamMembers }, { data: allProfiles }] = await Promise.all([
     supabase.from('event_team')

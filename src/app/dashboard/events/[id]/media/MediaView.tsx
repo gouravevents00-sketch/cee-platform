@@ -10,11 +10,12 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   used:                { label: 'Used in Post',        color: 'bg-green-900/40 text-green-400' },
 }
 
-const EMPTY_FORM = { file_url: '', caption: '', media_type: 'photo' }
+const EMPTY_FORM = { file_url: '', caption: '', media_type: 'photo', element_tag: '' }
 
-export default function MediaView({ eventId, mediaItems, canUpload, canApprove, currentUserId, userRole }: {
+export default function MediaView({ eventId, mediaItems, elements, canUpload, canApprove, currentUserId, userRole }: {
   eventId: string
   mediaItems: any[]
+  elements: { id: string; name: string }[]
   canUpload: boolean
   canApprove: boolean
   currentUserId: string
@@ -32,10 +33,13 @@ export default function MediaView({ eventId, mediaItems, canUpload, canApprove, 
   async function upload() {
     if (!form.file_url.trim()) return
     setLoading(true)
+    const captionWithTag = form.element_tag
+      ? `[${form.element_tag}]${form.caption ? ' ' + form.caption : ''}`
+      : form.caption
     const res = await fetch(`/api/events/${eventId}/media`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, caption: captionWithTag }),
     })
     const data = await res.json()
     if (!res.ok) { alert(data.error); setLoading(false); return }
@@ -204,6 +208,18 @@ export default function MediaView({ eventId, mediaItems, canUpload, canApprove, 
                 value={form.caption}
                 onChange={e => setForm(f => ({ ...f, caption: e.target.value }))}
               />
+              {elements.length > 0 && (
+                <select
+                  value={form.element_tag}
+                  onChange={e => setForm(f => ({ ...f, element_tag: e.target.value }))}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-500 text-gray-300"
+                >
+                  <option value="">Tag an element (optional)</option>
+                  {elements.map(el => (
+                    <option key={el.id} value={el.name}>{el.name}</option>
+                  ))}
+                </select>
+              )}
               <div className="flex gap-2">
                 {['photo', 'video', 'raw'].map(type => (
                   <button

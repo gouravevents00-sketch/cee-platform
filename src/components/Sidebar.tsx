@@ -34,7 +34,7 @@ export default function Sidebar({ profile }: SidebarProps) {
     { href: '/dashboard/social', label: 'Social Media', icon: Share2, show: isDirector || profile.role === 'design' || profile.role === 'admin' },
     { href: '/dashboard/followup', label: 'Follow-Up', icon: Bell, show: isDirector || isAccounts },
     { href: '/dashboard/goldmine', label: 'Goldmine', icon: Star, show: isDirector },
-    { href: '/dashboard/experiences', label: 'Experiences', icon: Sparkles, show: true },
+    { href: '/dashboard/experiences', label: 'Experiences', icon: Sparkles, show: isDirector || profile.role === 'admin' || profile.role === 'poc' },
     { href: '/dashboard/production', label: 'Production', icon: Hammer, show: isDirector || profile.role === 'admin' || isAccounts },
     { href: '/dashboard/inventory', label: 'Inventory', icon: Package, show: isDirector || profile.role === 'admin' },
     { href: '/dashboard/sales', label: 'Sales', icon: TrendingUp, show: isDirector || profile.role === 'admin' },

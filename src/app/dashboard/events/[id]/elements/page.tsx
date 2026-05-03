@@ -30,6 +30,13 @@ export default async function ElementsPage({ params }: { params: Promise<{ id: s
     ? await supabase.from('vendors').select('id, name, category').order('name')
     : { data: [] }
 
+  // Fetch event team members for assignment dropdown
+  const { data: teamMembers } = await supabase
+    .from('event_team')
+    .select('id, role_in_event, department, freelancer_name, is_freelancer, member:profiles!event_team_user_id_fkey(id, name)')
+    .eq('event_id', id)
+    .order('created_at')
+
   const showCosts = ['director', 'accounts'].includes(profile.role)
 
   return (
@@ -44,6 +51,7 @@ export default async function ElementsPage({ params }: { params: Promise<{ id: s
         eventId={id}
         elements={elements || []}
         vendors={vendors || []}
+        teamMembers={(teamMembers || []) as any[]}
         userRole={profile.role}
         userId={user.id}
         showCosts={showCosts}

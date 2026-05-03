@@ -55,6 +55,7 @@ function daysUntil(dateStr?: string) {
 export default function MyTasksView({ tasks, userId, userRole }: Props) {
   const [updating, setUpdating] = useState<string | null>(null)
   const [filter, setFilter] = useState<'active' | 'done' | 'all'>('active')
+  const [phaseFilter, setPhaseFilter] = useState<'current' | 'all'>(userRole === 'admin' ? 'current' : 'all')
   const router = useRouter()
   const supabase = createClient()
 
@@ -69,11 +70,12 @@ export default function MyTasksView({ tasks, userId, userRole }: Props) {
     setUpdating(null)
   }
 
-  const filtered = tasks.filter(t =>
-    filter === 'active' ? t.status !== 'done' :
-    filter === 'done' ? t.status === 'done' :
-    true
-  )
+  const filtered = tasks.filter(t => {
+    const statusMatch = filter === 'active' ? t.status !== 'done' :
+      filter === 'done' ? t.status === 'done' : true
+    const phaseMatch = phaseFilter === 'current' ? t.phase === t.events.current_phase : true
+    return statusMatch && phaseMatch
+  })
 
   // Group by event
   const byEvent: Record<string, { event: Task['events']; tasks: Task[] }> = {}
@@ -113,13 +115,23 @@ export default function MyTasksView({ tasks, userId, userRole }: Props) {
       </div>
 
       {/* Filter */}
-      <div className="flex gap-2 mb-5">
+      <div className="flex flex-wrap gap-2 mb-5">
         {(['active', 'all', 'done'] as const).map(f => (
           <button key={f} onClick={() => setFilter(f)}
             className={`px-3 py-1.5 rounded-xl text-xs font-medium capitalize transition-colors ${filter === f ? 'bg-amber-500 text-black' : 'bg-gray-900 border border-gray-800 text-gray-400 hover:text-white'}`}>
             {f === 'active' ? 'Active' : f === 'done' ? 'Completed' : 'All Tasks'}
           </button>
         ))}
+        <div className="ml-auto flex gap-2">
+          <button onClick={() => setPhaseFilter('current')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${phaseFilter === 'current' ? 'bg-blue-600 text-white' : 'bg-gray-900 border border-gray-800 text-gray-400 hover:text-white'}`}>
+            Current Phase
+          </button>
+          <button onClick={() => setPhaseFilter('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${phaseFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-900 border border-gray-800 text-gray-400 hover:text-white'}`}>
+            All Phases
+          </button>
+        </div>
       </div>
 
       {eventGroups.length === 0 ? (
