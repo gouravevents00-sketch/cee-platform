@@ -8,13 +8,14 @@ interface Props {
   paymentId: string
   vendorName: string
   category?: string
+  label?: string
   amount: number
   status: string
   paidDate?: string
   canEdit: boolean
 }
 
-export default function VendorPaymentRow({ paymentId, vendorName, category, amount, status, paidDate, canEdit }: Props) {
+export default function VendorPaymentRow({ paymentId, vendorName, category, label, amount, status, paidDate, canEdit }: Props) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
@@ -51,6 +52,9 @@ export default function VendorPaymentRow({ paymentId, vendorName, category, amou
         <span className="text-gray-300 text-sm">
           {vendorName}{category ? ` (${category})` : ''}
         </span>
+        {label && (
+          <div className="text-gray-500 text-xs">{label}</div>
+        )}
         {paidDate && status === 'paid' && (
           <span className="text-gray-600 text-xs ml-2">
             paid {new Date(paidDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
