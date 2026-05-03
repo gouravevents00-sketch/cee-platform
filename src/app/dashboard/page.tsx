@@ -227,7 +227,7 @@ export default async function DashboardPage() {
           </Link>
         )}
 
-        {!isDirector && (
+        {!isDirector && !isAccounts && (
           <Link href="/dashboard/my-tasks" className="bg-gray-900 border border-blue-900/30 hover:border-blue-700/50 rounded-2xl p-4 transition-colors">
             <div className="flex items-center gap-2 mb-2">
               <Clock size={15} className="text-blue-400" />
@@ -236,6 +236,18 @@ export default async function DashboardPage() {
             <p className="text-white text-3xl font-bold">{myTasks?.length || 0}</p>
             {(myTasks?.length || 0) > 0 && (
               <p className="text-blue-400 text-xs mt-1">tap to view all</p>
+            )}
+          </Link>
+        )}
+        {isAccounts && (
+          <Link href="/dashboard/expenses" className="bg-gray-900 border border-green-900/30 hover:border-green-700/50 rounded-2xl p-4 transition-colors">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle size={15} className="text-green-400" />
+              <span className="text-gray-400 text-xs">Pending Expenses</span>
+            </div>
+            <p className="text-white text-3xl font-bold">{pendingExpenses?.length || 0}</p>
+            {(pendingExpenses?.length || 0) > 0 && (
+              <p className="text-green-400 text-xs mt-1">needs review</p>
             )}
           </Link>
         )}

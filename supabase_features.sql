@@ -19,6 +19,9 @@ CREATE TABLE IF NOT EXISTS event_team (
 );
 
 ALTER TABLE event_team ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "event_team_select" ON event_team;
+DROP POLICY IF EXISTS "event_team_insert" ON event_team;
+DROP POLICY IF EXISTS "event_team_delete" ON event_team;
 CREATE POLICY "event_team_select" ON event_team FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "event_team_insert" ON event_team FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "event_team_delete" ON event_team FOR DELETE USING (auth.role() = 'authenticated');
@@ -41,6 +44,10 @@ CREATE TABLE IF NOT EXISTS artwork_tasks (
 );
 
 ALTER TABLE artwork_tasks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "artwork_select" ON artwork_tasks;
+DROP POLICY IF EXISTS "artwork_insert" ON artwork_tasks;
+DROP POLICY IF EXISTS "artwork_update" ON artwork_tasks;
+DROP POLICY IF EXISTS "artwork_delete" ON artwork_tasks;
 CREATE POLICY "artwork_select" ON artwork_tasks FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "artwork_insert" ON artwork_tasks FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "artwork_update" ON artwork_tasks FOR UPDATE USING (auth.role() = 'authenticated');
@@ -68,6 +75,10 @@ CREATE TABLE IF NOT EXISTS leads (
 );
 
 ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "leads_select" ON leads;
+DROP POLICY IF EXISTS "leads_insert" ON leads;
+DROP POLICY IF EXISTS "leads_update" ON leads;
+DROP POLICY IF EXISTS "leads_delete" ON leads;
 CREATE POLICY "leads_select" ON leads FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "leads_insert" ON leads FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "leads_update" ON leads FOR UPDATE USING (auth.role() = 'authenticated');
@@ -96,6 +107,10 @@ CREATE TABLE IF NOT EXISTS event_media (
 );
 
 ALTER TABLE event_media ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "media_select" ON event_media;
+DROP POLICY IF EXISTS "media_insert" ON event_media;
+DROP POLICY IF EXISTS "media_update" ON event_media;
+DROP POLICY IF EXISTS "media_delete" ON event_media;
 CREATE POLICY "media_select" ON event_media FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "media_insert" ON event_media FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "media_update" ON event_media FOR UPDATE USING (auth.role() = 'authenticated');

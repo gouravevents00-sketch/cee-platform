@@ -13,13 +13,10 @@ export default async function ArtworkPage({ params }: { params: Promise<{ id: st
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
   if (!profile) redirect('/login')
 
-  const { data: event } = await supabase.from('events').select('id, name, status').eq('id', id).single()
+  const { data: event } = await supabase.from('events').select('id, name, status, poc_id').eq('id', id).single()
   if (!event) notFound()
 
-  if (profile.role === 'poc') {
-    const { data: ev } = await supabase.from('events').select('poc_id').eq('id', id).single()
-    if (ev?.poc_id !== user.id) redirect('/dashboard')
-  }
+  if (profile.role === 'poc' && event.poc_id !== user.id) redirect('/dashboard')
   if (profile.role === 'accounts') redirect('/dashboard')
 
   const [{ data: artworkTasks }, { data: designers }, { data: elements }] = await Promise.all([

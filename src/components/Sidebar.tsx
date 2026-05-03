@@ -88,10 +88,10 @@ export default function Sidebar({ profile }: SidebarProps) {
 
       {/* Profile + Notification + Logout */}
       <div className="p-3 border-t border-gray-900">
-        <div className="flex items-center justify-between px-3 py-2 mb-1">
-          <div className="min-w-0">
+        <div className="flex items-center gap-2 px-3 py-2 mb-1">
+          <div className="min-w-0 flex-1">
             <p className="text-white text-sm font-medium truncate">{profile.name}</p>
-            <p className="text-gray-500 text-xs">{ROLE_LABELS[profile.role]}</p>
+            <p className="text-gray-500 text-xs truncate">{ROLE_LABELS[profile.role]}</p>
           </div>
           <NotificationBell userId={profile.id} />
         </div>
