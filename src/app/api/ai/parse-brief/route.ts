@@ -1,27 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import * as XLSX from 'xlsx'
-import mammoth from 'mammoth'
 
-async function extractTextFromFile(formData: FormData): Promise<string> {
-  const file = formData.get('file') as File
-  const brief = formData.get('brief') as string
-
-  // Plain text brief (no file)
-  if (!file && brief) return brief
-
-  if (!file) throw new Error('No file provided')
-
+async function extractTextFromFile(file: File): Promise<string> {
   const buffer = Buffer.from(await file.arrayBuffer())
   const name = file.name.toLowerCase()
 
-  // Excel files
+  // Excel / CSV
   if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv')) {
+    const XLSX = await import('xlsx')
     const workbook = XLSX.read(buffer, { type: 'buffer' })
     let text = ''
     for (const sheetName of workbook.SheetNames) {
       const sheet = workbook.Sheets[sheetName]
-      // Convert to array of arrays for better readability
       const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' }) as any[][]
       text += `[Sheet: ${sheetName}]\n`
       for (const row of rows) {
@@ -30,17 +20,18 @@ async function extractTextFromFile(formData: FormData): Promise<string> {
       }
       text += '\n'
     }
-    return text
+    return text.trim() || 'Empty spreadsheet'
   }
 
-  // Word files
+  // Word documents
   if (name.endsWith('.docx') || name.endsWith('.doc')) {
+    const mammoth = await import('mammoth')
     const result = await mammoth.extractRawText({ buffer })
-    return result.value
+    return result.value.trim() || 'Empty document'
   }
 
-  // Plain text / other
-  return buffer.toString('utf-8')
+  // Plain text / txt
+  return buffer.toString('utf-8').trim()
 }
 
 const BRIEF_PROMPT = (brief: string, eventName: string) => `You are a quotation assistant for Creative Era Events, a premium Indian event management company.
@@ -97,10 +88,15 @@ export async function POST(req: Request) {
   if (contentType.includes('multipart/form-data')) {
     const formData = await req.formData()
     eventName = (formData.get('eventName') as string) || ''
-    try {
-      briefText = await extractTextFromFile(formData)
-    } catch (e: any) {
-      return NextResponse.json({ error: e.message || 'Failed to read file' }, { status: 400 })
+    const file = formData.get('file') as File | null
+    if (file && file.size > 0) {
+      try {
+        briefText = await extractTextFromFile(file)
+      } catch (e: any) {
+        return NextResponse.json({ error: `Could not read file: ${e.message}` }, { status: 400 })
+      }
+    } else {
+      briefText = (formData.get('brief') as string) || ''
     }
   } else {
     const body = await req.json()
@@ -108,7 +104,9 @@ export async function POST(req: Request) {
     eventName = body.eventName || ''
   }
 
-  if (!briefText?.trim()) return NextResponse.json({ error: 'No content found in file' }, { status: 400 })
+  if (!briefText?.trim()) {
+    return NextResponse.json({ error: 'No content found in file' }, { status: 400 })
+  }
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -125,14 +123,19 @@ export async function POST(req: Request) {
       }),
     })
 
+    if (!res.ok) {
+      const errBody = await res.text()
+      return NextResponse.json({ error: `AI API error: ${res.status} — ${errBody}` }, { status: 500 })
+    }
+
     const data = await res.json()
     const text = data.content?.[0]?.text?.trim()
-    if (!text) return NextResponse.json({ error: 'No rows generated' }, { status: 500 })
+    if (!text) return NextResponse.json({ error: 'AI returned empty response' }, { status: 500 })
 
     const clean = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
     const rows = JSON.parse(clean)
     return NextResponse.json({ rows })
-  } catch {
-    return NextResponse.json({ error: 'Failed to parse document' }, { status: 500 })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message || 'Failed to parse document' }, { status: 500 })
   }
 }
