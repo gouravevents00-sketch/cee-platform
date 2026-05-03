@@ -220,6 +220,14 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         )}
         {(isDirector || profile.role === 'accounts') && (
           <Link
+            href={`/dashboard/events/${id}/invoice`}
+            className="text-sm bg-gray-900 border border-amber-900/30 hover:border-amber-700/60 text-amber-400 px-4 py-2 rounded-xl transition-colors"
+          >
+            Invoice
+          </Link>
+        )}
+        {(isDirector || profile.role === 'accounts') && (
+          <Link
             href={`/dashboard/events/${id}/pnl`}
             className="text-sm bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-300 px-4 py-2 rounded-xl transition-colors"
           >

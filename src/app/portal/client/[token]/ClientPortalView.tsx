@@ -8,6 +8,8 @@ interface Props {
   elements: any[]
   payments: any[]
   approvals: any[]
+  invoice: any | null
+  receipts: any[]
   token: string
 }
 
@@ -19,7 +21,7 @@ const STATUS_COLORS: Record<string, string> = {
   additional: 'bg-amber-900/50 text-amber-400',
 }
 
-export default function ClientPortalView({ event, elements, payments, approvals, token }: Props) {
+export default function ClientPortalView({ event, elements, payments, approvals, invoice, receipts, token }: Props) {
   const [showElements, setShowElements] = useState(false)
   const [deciding, setDeciding] = useState<string | null>(null)
   const [comments, setComments] = useState<Record<string, string>>({})
@@ -199,7 +201,7 @@ export default function ClientPortalView({ event, elements, payments, approvals,
                     : <Clock size={14} className="text-gray-500 flex-shrink-0" />
                   }
                   <div>
-                    <p className="text-gray-300 text-sm capitalize">{p.type}</p>
+                    <p className="text-gray-300 text-sm capitalize">{p.label || p.type}</p>
                     {p.due_date && p.status !== 'received' && (
                       <p className="text-gray-600 text-xs">Due: {new Date(p.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                     )}
@@ -251,6 +253,64 @@ export default function ClientPortalView({ event, elements, payments, approvals,
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Invoice */}
+      {invoice && invoice.status !== 'draft' && (
+        <div className="bg-gray-900 border border-amber-900/30 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-white font-semibold text-sm flex items-center gap-2">
+              <IndianRupee size={15} className="text-amber-400" /> Invoice
+            </h2>
+            <span className={`text-xs px-2 py-0.5 rounded-full ${
+              invoice.status === 'paid' ? 'bg-green-900/50 text-green-400' :
+              invoice.status === 'partial' ? 'bg-amber-900/50 text-amber-400' :
+              'bg-blue-900/50 text-blue-400'
+            }`}>{invoice.status?.toUpperCase()}</span>
+          </div>
+          <div className="space-y-1.5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Invoice No.</span>
+              <span className="text-gray-300 font-medium">{invoice.invoice_number || '—'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Total Amount</span>
+              <span className="text-white font-bold">₹{(invoice.total || 0).toLocaleString('en-IN')}</span>
+            </div>
+            {invoice.total > 0 && totalReceived > 0 && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Balance Due</span>
+                <span className={`font-semibold ${invoice.total - totalReceived > 0 ? 'text-amber-400' : 'text-green-400'}`}>
+                  ₹{Math.max(0, invoice.total - totalReceived).toLocaleString('en-IN')}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Receipts */}
+      {receipts.length > 0 && (
+        <div className="bg-gray-900 border border-green-900/30 rounded-2xl p-5">
+          <h2 className="text-white font-semibold text-sm flex items-center gap-2 mb-3">
+            <CheckCircle2 size={15} className="text-green-400" /> Payment Receipts
+          </h2>
+          <div className="space-y-2">
+            {receipts.map((r: any) => (
+              <div key={r.id} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
+                <div>
+                  <p className="text-gray-300 text-sm font-medium">{r.receipt_number || 'Receipt'}</p>
+                  <p className="text-gray-500 text-xs">
+                    {new Date(r.receipt_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {r.payment_mode ? ` · ${r.payment_mode.replace('_', ' ')}` : ''}
+                    {r.reference_no ? ` · ${r.reference_no}` : ''}
+                  </p>
+                </div>
+                <span className="text-green-400 font-bold text-sm">₹{r.amount.toLocaleString('en-IN')}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

@@ -24,6 +24,8 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
     { data: elements },
     { data: payments },
     { data: approvals },
+    { data: invoice },
+    { data: receipts },
   ] = await Promise.all([
     supabase.from('elements')
       .select('id, name, specs, size, quantity, material, status, vendors(name)')
@@ -31,7 +33,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
       .neq('status', 'cancelled')
       .order('name'),
     supabase.from('payments')
-      .select('id, type, amount, due_date, received_date, status')
+      .select('id, type, label, amount, due_date, received_date, status')
       .eq('event_id', eventId)
       .order('created_at'),
     supabase.from('approvals')
@@ -39,6 +41,11 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
       .eq('event_id', eventId)
       .in('type', ['Layout Mockup Approval', 'Artwork / Creative Approval', 'Print Approval'])
       .order('requested_at', { ascending: false }),
+    supabase.from('client_invoices').select('id, invoice_number, total, status, invoice_date')
+      .eq('event_id', eventId)
+      .order('created_at', { ascending: false }).limit(1).single(),
+    supabase.from('client_receipts').select('id, receipt_number, receipt_date, amount, payment_mode, reference_no')
+      .eq('event_id', eventId).order('receipt_date'),
   ])
 
   return (
@@ -47,6 +54,8 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
       elements={elements || []}
       payments={payments || []}
       approvals={approvals || []}
+      invoice={invoice || null}
+      receipts={receipts || []}
       token={token}
     />
   )
