@@ -243,6 +243,7 @@ export default function QuotationBuilder({
   const [aiLoading, setAiLoading] = useState(false)
   const [showVendorCol, setShowVendorCol] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const aiFileRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -407,6 +408,48 @@ export default function QuotationBuilder({
       alert('AI parse failed')
     }
     setAiLoading(false)
+  }
+
+  // ── AI File Upload ─────────────────────────────────────────────
+  async function handleAIFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAiLoading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('eventName', eventName)
+      const res = await fetch('/api/ai/parse-brief', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (data.rows?.length) {
+        const parsed: QuoteRow[] = data.rows.map((r: any): QuoteRow => {
+          if (r._type === 'section') return { _type: 'section', label: r.label || '' }
+          return {
+            _type: 'item',
+            description: r.description || '',
+            specs: r.specs || '',
+            dim_str: r.dim_str || '',
+            area_sqft: parseDimStr(r.dim_str || ''),
+            days: r.days || 1,
+            qty: r.qty || 1,
+            rate: r.rate || 0,
+            vendor_rate: 0,
+            vendor_id: '',
+            is_lumpsum: false,
+            lump_amount: 0,
+          }
+        })
+        setRows(prev => [...prev, ...parsed])
+        setShowAI(false)
+      } else {
+        alert(data.error || 'No rows could be extracted from file')
+      }
+    } catch {
+      alert('File parse failed')
+    }
+    setAiLoading(false)
+    // Reset file input so same file can be re-uploaded
+    e.target.value = ''
   }
 
   // ── JSON Export ────────────────────────────────────────────────
@@ -610,14 +653,43 @@ export default function QuotationBuilder({
         <div className="bg-gray-900 border border-purple-900 rounded-2xl p-4 print:hidden">
           <div className="flex items-center justify-between mb-3">
             <p className="text-purple-400 font-semibold text-sm flex items-center gap-2">
-              <Wand2 size={14} /> AI Brief Parser — paste client email / tender document
+              <Wand2 size={14} /> AI Brief Parser
             </p>
             <button onClick={() => setShowAI(false)} className="text-gray-500 hover:text-white text-xs">✕ Close</button>
           </div>
+
+          {/* File upload option */}
+          <div className="mb-3 p-3 bg-gray-800/60 border border-gray-700 rounded-xl flex items-center justify-between gap-3">
+            <div>
+              <p className="text-gray-300 text-sm font-medium">Upload Element Sheet</p>
+              <p className="text-gray-500 text-xs mt-0.5">.xlsx, .xls, .csv, .docx supported</p>
+            </div>
+            <button
+              onClick={() => aiFileRef.current?.click()}
+              disabled={aiLoading}
+              className="flex items-center gap-1.5 bg-purple-700 hover:bg-purple-600 text-white text-sm px-4 py-2 rounded-xl transition-colors disabled:opacity-50 flex-shrink-0"
+            >
+              <Upload size={13} /> {aiLoading ? 'Parsing...' : 'Upload File'}
+            </button>
+            <input
+              ref={aiFileRef}
+              type="file"
+              accept=".xlsx,.xls,.csv,.docx,.doc,.txt"
+              onChange={handleAIFileUpload}
+              className="hidden"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 mb-2">
+            <div className="flex-1 h-px bg-gray-700" />
+            <span className="text-gray-600 text-xs">or paste text</span>
+            <div className="flex-1 h-px bg-gray-700" />
+          </div>
+
           <textarea
             value={aiBrief}
             onChange={e => setAiBrief(e.target.value)}
-            rows={6}
+            rows={5}
             placeholder="Paste the client brief, RFQ, tender document, or WhatsApp requirements here..."
             className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-gray-300 text-sm focus:outline-none focus:border-purple-500 resize-none"
           />
