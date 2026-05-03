@@ -201,6 +201,33 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             Agreement
           </Link>
         )}
+        {/* Team — director + admin */}
+        {(isDirector || profile.role === 'admin') && (
+          <Link
+            href={`/dashboard/events/${id}/team`}
+            className="text-sm bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-300 px-4 py-2 rounded-xl transition-colors"
+          >
+            Team
+          </Link>
+        )}
+        {/* Artwork — all except accounts */}
+        {profile.role !== 'accounts' && (
+          <Link
+            href={`/dashboard/events/${id}/artwork`}
+            className="text-sm bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-300 px-4 py-2 rounded-xl transition-colors"
+          >
+            Artwork
+          </Link>
+        )}
+        {/* Media — all except accounts */}
+        {profile.role !== 'accounts' && (
+          <Link
+            href={`/dashboard/events/${id}/media`}
+            className="text-sm bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-300 px-4 py-2 rounded-xl transition-colors"
+          >
+            Media
+          </Link>
+        )}
       </div>
 
       {/* Phase Tracker */}

@@ -44,8 +44,19 @@ const STATUS_CONFIG = {
 
 const EMPTY_FORM = { event_id: '', platform: 'instagram', content_type: 'reel', caption: '', scheduled_date: '', notes: '' }
 
-export default function SocialCalendar({ posts, events, userId, userRole, isDirector }: {
+interface MediaItem {
+  id: string
+  file_url: string
+  caption?: string
+  media_type: string
+  status: string
+  event?: { name: string }
+  uploader?: { name: string }
+}
+
+export default function SocialCalendar({ posts, events, availableMedia, userId, userRole, isDirector }: {
   posts: Post[], events: { id: string; name: string }[],
+  availableMedia: MediaItem[],
   userId: string, userRole: string, isDirector: boolean
 }) {
   const [filter, setFilter] = useState<string>('all')
@@ -265,6 +276,42 @@ export default function SocialCalendar({ posts, events, userId, userRole, isDire
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Event Media Library — approved_for_social */}
+      {availableMedia.length > 0 && (
+        <div className="mt-8">
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="text-white font-semibold text-sm">Event Media Library</h2>
+            <span className="text-xs bg-amber-900/40 text-amber-400 px-2 py-0.5 rounded-full">{availableMedia.length} ready</span>
+          </div>
+          <p className="text-gray-600 text-xs mb-3">Photos and videos approved for social content by POC/Director</p>
+          <div className="space-y-2">
+            {availableMedia.map(item => (
+              <div key={item.id} className="bg-gray-900 border border-amber-900/30 rounded-xl p-3 flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-amber-900/30 flex items-center justify-center flex-shrink-0 mt-0.5 text-amber-400 text-xs font-bold">
+                  {item.media_type === 'video' ? '▶' : '📷'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                    <span className="text-xs text-amber-400 capitalize">{item.media_type}</span>
+                    {item.event?.name && <span className="text-xs text-gray-500">{item.event.name}</span>}
+                    {item.uploader?.name && <span className="text-xs text-gray-600">by {item.uploader.name}</span>}
+                  </div>
+                  {item.caption && <p className="text-gray-300 text-xs">{item.caption}</p>}
+                  <a
+                    href={item.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-amber-400 hover:text-amber-300 transition-colors mt-0.5 inline-block truncate max-w-[280px]"
+                  >
+                    Open file ↗
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

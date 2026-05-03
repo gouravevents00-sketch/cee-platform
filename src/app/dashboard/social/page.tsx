@@ -10,11 +10,15 @@ export default async function SocialPage() {
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
   if (!profile || !['director', 'admin', 'design'].includes(profile.role)) redirect('/dashboard')
 
-  const [{ data: posts }, { data: events }] = await Promise.all([
+  const [{ data: posts }, { data: events }, { data: availableMedia }] = await Promise.all([
     supabase.from('social_posts')
       .select('*, events(name), creator:profiles!social_posts_created_by_fkey(name)')
       .order('scheduled_date', { ascending: true }),
     supabase.from('events').select('id, name').neq('status', 'cancelled').order('name'),
+    supabase.from('event_media')
+      .select('*, event:events!event_media_event_id_fkey(name), uploader:profiles!event_media_uploaded_by_fkey(name)')
+      .eq('status', 'approved_for_social')
+      .order('created_at', { ascending: false }),
   ])
 
   return (
@@ -26,6 +30,7 @@ export default async function SocialPage() {
       <SocialCalendar
         posts={posts || []}
         events={events || []}
+        availableMedia={availableMedia || []}
         userId={user.id}
         userRole={profile.role}
         isDirector={profile.role === 'director'}

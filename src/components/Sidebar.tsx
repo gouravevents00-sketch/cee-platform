@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, CalendarDays, CheckSquare, Receipt, LogOut, Users, Building2, Truck, Menu, X, Share2, Sparkles, Bell, Star, Hammer, Package, Calendar, ListTodo } from 'lucide-react'
+import { LayoutDashboard, CalendarDays, CheckSquare, Receipt, LogOut, Users, Building2, Truck, Menu, X, Share2, Sparkles, Bell, Star, Hammer, Package, Calendar, ListTodo, TrendingUp } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Profile, ROLE_LABELS } from '@/lib/types'
 import NotificationBell from './NotificationBell'
@@ -37,6 +37,7 @@ export default function Sidebar({ profile }: SidebarProps) {
     { href: '/dashboard/experiences', label: 'Experiences', icon: Sparkles, show: true },
     { href: '/dashboard/production', label: 'Production', icon: Hammer, show: isDirector || profile.role === 'admin' || isAccounts },
     { href: '/dashboard/inventory', label: 'Inventory', icon: Package, show: isDirector || profile.role === 'admin' },
+    { href: '/dashboard/sales', label: 'Sales', icon: TrendingUp, show: isDirector || profile.role === 'admin' },
   ].filter(item => item.show)
 
   async function handleLogout() {
