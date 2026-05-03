@@ -11,7 +11,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-  if (!profile || !['director', 'accounts'].includes(profile.role)) redirect('/dashboard')
+  if (!profile || !['director', 'accounts', 'admin'].includes(profile.role)) redirect('/dashboard')
 
   const { data: event } = await supabase
     .from('events')
@@ -21,11 +21,16 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
 
   if (!event) notFound()
 
-  const [{ data: quotation }, { data: elements }] = await Promise.all([
+  const [
+    { data: quotation },
+    { data: elements },
+    { data: vendors },
+  ] = await Promise.all([
     supabase.from('quotations').select('*').eq('event_id', id)
       .order('created_at', { ascending: false }).limit(1).single(),
-    supabase.from('elements').select('name, specs, size, quantity, client_rate, material')
+    supabase.from('elements').select('name, specs, size, quantity, client_rate, vendor_rate, vendor_id, material')
       .eq('event_id', id).neq('status', 'cancelled').order('created_at'),
+    supabase.from('vendors').select('id, name, category').order('name'),
   ])
 
   const client = (event as any).clients
@@ -48,6 +53,8 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
         clientEmail={client?.contact_email}
         existingQuotation={quotation || null}
         eventElements={(elements || []) as any[]}
+        vendors={(vendors || []) as { id: string; name: string; category?: string }[]}
+        userRole={profile.role}
       />
     </div>
   )
