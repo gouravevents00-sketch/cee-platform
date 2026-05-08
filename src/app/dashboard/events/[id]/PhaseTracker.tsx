@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PHASES } from '@/lib/types'
-import { CheckCircle2, Circle, Clock, AlertCircle, ChevronDown, ChevronUp, Lock, MessageSquare } from 'lucide-react'
+import { CheckCircle2, Circle, Clock, AlertCircle, ChevronDown, ChevronUp, Lock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh'
 
@@ -28,47 +28,6 @@ interface Props {
   isDirector: boolean
 }
 
-function TaskNoteInput({ taskId, currentNote }: { taskId: string, currentNote?: string }) {
-  const [open, setOpen] = useState(false)
-  const [note, setNote] = useState(currentNote || '')
-  const [saving, setSaving] = useState(false)
-  const router = useRouter()
-  const supabase = createClient()
-
-  async function saveNote() {
-    setSaving(true)
-    await supabase.from('event_tasks').update({ notes: note || null }).eq('id', taskId)
-    setOpen(false)
-    router.refresh()
-    setSaving(false)
-  }
-
-  if (!open) {
-    return (
-      <button onClick={() => setOpen(true)} className="text-xs text-gray-600 hover:text-gray-400 flex items-center gap-1 mt-1">
-        <MessageSquare size={11} /> {currentNote ? 'Edit note' : 'Add note'}
-      </button>
-    )
-  }
-
-  return (
-    <div className="mt-2 flex gap-2">
-      <input
-        autoFocus
-        type="text"
-        value={note}
-        onChange={e => setNote(e.target.value)}
-        onKeyDown={e => e.key === 'Enter' && saveNote()}
-        placeholder="Add a note..."
-        className="flex-1 bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-amber-500"
-      />
-      <button onClick={saveNote} disabled={saving} className="text-xs bg-amber-500 text-black font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50">
-        {saving ? '...' : 'Save'}
-      </button>
-      <button onClick={() => setOpen(false)} className="text-xs text-gray-500 hover:text-white px-2">✕</button>
-    </div>
-  )
-}
 
 const TASK_TYPE_BADGE = {
   action: 'bg-gray-800 text-gray-400',
@@ -85,33 +44,77 @@ const TASK_TYPE_LABEL = {
 export default function PhaseTracker({ eventId, tasksByPhase, currentPhase, userRole, userId, isDirector }: Props) {
   const [expandedPhase, setExpandedPhase] = useState<number>(currentPhase)
   const [updatingTask, setUpdatingTask] = useState<string | null>(null)
+  const [completingTask, setCompletingTask] = useState<Task | null>(null)
+  const [completionNote, setCompletionNote] = useState('')
   const router = useRouter()
   const supabase = createClient()
   useRealtimeRefresh(['event_tasks', 'approvals'], eventId)
 
-  async function updateTaskStatus(task: Task, newStatus: 'in_progress' | 'done' | 'pending') {
-    setUpdatingTask(task.id)
+  function requestDone(task: Task) {
+    setCompletingTask(task)
+    setCompletionNote('')
+  }
+
+  async function confirmDone() {
+    if (!completingTask || !completionNote.trim()) return
+    setUpdatingTask(completingTask.id)
 
     const { error } = await supabase
       .from('event_tasks')
       .update({
-        status: newStatus,
-        completed_by: newStatus === 'done' ? userId : null,
-        completed_at: newStatus === 'done' ? new Date().toISOString() : null,
+        status: 'done',
+        completed_by: userId,
+        completed_at: new Date().toISOString(),
+        notes: completionNote.trim(),
       })
-      .eq('id', task.id)
+      .eq('id', completingTask.id)
 
     if (!error) {
-      // Check if all tasks in current phase are done — advance phase
-      if (newStatus === 'done') {
-        const phaseTasks = tasksByPhase[task.phase] || []
-        const allDone = phaseTasks.every(t => t.id === task.id || t.status === 'done')
-        if (allDone && task.phase === currentPhase && currentPhase < 7) {
-          await supabase.from('events').update({ current_phase: currentPhase + 1 }).eq('id', eventId)
-        }
+      const phaseTasks = tasksByPhase[completingTask.phase] || []
+      const allDone = phaseTasks.every(t => t.id === completingTask.id || t.status === 'done')
+      if (allDone && completingTask.phase === currentPhase && currentPhase < 7) {
+        await supabase.from('events').update({ current_phase: currentPhase + 1 }).eq('id', eventId)
+        // Phase completion bonus
+        await fetch('/api/points', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            target_user_id: userId,
+            points: 15,
+            reason: `Phase ${completingTask.phase} complete — ${completingTask.phase_name}`,
+            ref_type: 'phase',
+            ref_id: eventId,
+          }),
+        })
+      } else {
+        // Regular task completion
+        await fetch('/api/points', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            target_user_id: userId,
+            points: 10,
+            reason: `Task done: ${completingTask.task_name}`,
+            ref_type: 'task',
+            ref_id: completingTask.id,
+          }),
+        })
       }
       router.refresh()
     }
+    setUpdatingTask(null)
+    setCompletingTask(null)
+    setCompletionNote('')
+  }
+
+  async function updateTaskStatus(task: Task, newStatus: 'in_progress' | 'pending') {
+    setUpdatingTask(task.id)
+    await supabase.from('event_tasks').update({
+      status: newStatus,
+      completed_by: null,
+      completed_at: null,
+    }).eq('id', task.id)
+    router.refresh()
     setUpdatingTask(null)
   }
 
@@ -124,6 +127,40 @@ export default function PhaseTracker({ eventId, tasksByPhase, currentPhase, user
 
   return (
     <div className="space-y-2">
+
+      {/* Completion note modal */}
+      {completingTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-5 w-full max-w-sm space-y-3">
+            <p className="text-white text-sm font-semibold">Mark as Done</p>
+            <p className="text-gray-400 text-xs">{completingTask.task_name}</p>
+            <textarea
+              autoFocus
+              rows={3}
+              value={completionNote}
+              onChange={e => setCompletionNote(e.target.value)}
+              placeholder="What was done? Add proof or details… (required)"
+              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 resize-none"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={confirmDone}
+                disabled={!completionNote.trim() || updatingTask === completingTask.id}
+                className="flex-1 bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-xl transition-colors"
+              >
+                {updatingTask === completingTask.id ? 'Saving…' : 'Confirm Done'}
+              </button>
+              <button
+                onClick={() => { setCompletingTask(null); setCompletionNote('') }}
+                className="px-4 text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {PHASES.map(phase => {
         const phaseTasks = tasksByPhase[phase.number] || []
         const doneTasks = phaseTasks.filter(t => t.status === 'done').length
@@ -195,10 +232,11 @@ export default function PhaseTracker({ eventId, tasksByPhase, currentPhase, user
                     >
                       {/* Checkbox */}
                       <button
-                        onClick={() => canUpdate && !isUpdating && updateTaskStatus(
-                          task,
-                          task.status === 'done' ? 'pending' : 'done'
-                        )}
+                        onClick={() => {
+                          if (!canUpdate || isUpdating) return
+                          if (task.status === 'done') updateTaskStatus(task, 'pending')
+                          else requestDone(task)
+                        }}
                         disabled={!canUpdate || isUpdating}
                         className={`mt-0.5 flex-shrink-0 transition-colors ${canUpdate ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'}`}
                       >
@@ -238,12 +276,11 @@ export default function PhaseTracker({ eventId, tasksByPhase, currentPhase, user
                             </button>
                           )}
                         </div>
-                        {/* Task Note */}
+                        {/* Completion proof */}
                         {task.notes && (
-                          <p className="text-gray-500 text-xs mt-1 bg-gray-800 rounded-lg px-2 py-1">{task.notes}</p>
-                        )}
-                        {canUpdate && (
-                          <TaskNoteInput taskId={task.id} currentNote={task.notes} />
+                          <p className="text-gray-500 text-xs mt-1 bg-gray-800 rounded-lg px-2 py-1">
+                            ✓ {task.notes}
+                          </p>
                         )}
                       </div>
                     </div>

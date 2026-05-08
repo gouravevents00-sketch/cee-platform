@@ -6,6 +6,7 @@ import {
   Sparkles, Hammer, Clock, AlertTriangle, ArrowRight
 } from 'lucide-react'
 import { PHASES, STATUS_COLORS, ORDER_STATUS_COLORS, PRODUCTION_STATUS_COLORS, OrderStatus, ProductionStatus } from '@/lib/types'
+import CopyBriefLink from '@/components/CopyBriefLink'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -130,6 +131,19 @@ export default async function DashboardPage() {
           {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </p>
       </div>
+
+      {/* Director quick actions */}
+      {isDirector && (
+        <div className="flex gap-2 flex-wrap">
+          <CopyBriefLink />
+          <Link
+            href="/dashboard/events/new"
+            className="flex items-center gap-2 px-4 py-3 rounded-xl border border-gray-700 text-gray-300 hover:border-gray-500 hover:text-white text-sm font-medium transition-all"
+          >
+            <CalendarDays size={15} /> New Event
+          </Link>
+        </div>
+      )}
 
       {/* ── Director: Needs Your Attention ── */}
       {isDirector && attentionCount > 0 && (

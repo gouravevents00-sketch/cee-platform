@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { Plus, CheckCircle2, Clock, AlertCircle, IndianRupee, ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
+import { Plus, CheckCircle2, Clock, AlertCircle, IndianRupee, ArrowDownCircle, ArrowUpCircle, Upload, FileText, ExternalLink } from 'lucide-react'
 
 interface ClientPayment {
   id: string
@@ -22,9 +22,11 @@ interface VendorPayment {
   amount: number
   due_date?: string
   paid_date?: string
-  status: 'pending' | 'paid' | 'overdue'
+  status: 'pending' | 'invoice_received' | 'paid' | 'overdue'
   label?: string
   notes?: string
+  invoice_url?: string
+  invoice_received_at?: string
   vendors?: { name: string; category?: string }
 }
 
@@ -34,6 +36,7 @@ interface Props {
   vendorPayments: VendorPayment[]
   vendors: { id: string; name: string; category?: string }[]
   isDirector: boolean
+  isAccounts: boolean
 }
 
 const CLIENT_TYPE_COLORS = {
@@ -42,7 +45,7 @@ const CLIENT_TYPE_COLORS = {
   final: 'bg-green-900/50 text-green-400',
 }
 
-export default function PaymentTracker({ eventId, payments, vendorPayments, vendors, isDirector }: Props) {
+export default function PaymentTracker({ eventId, payments, vendorPayments, vendors, isDirector, isAccounts }: Props) {
   const [tab, setTab] = useState<'client' | 'vendor'>('client')
   const [showClientForm, setShowClientForm] = useState(false)
   const [showVendorForm, setShowVendorForm] = useState(false)
@@ -50,16 +53,42 @@ export default function PaymentTracker({ eventId, payments, vendorPayments, vend
   const [vendorForm, setVendorForm] = useState({ vendor_id: '', label: '', amount: '', due_date: '', notes: '' })
   const [loading, setLoading] = useState(false)
   const [marking, setMarking] = useState<string | null>(null)
+  const [invoiceUploading, setInvoiceUploading] = useState<string | null>(null)
+  const [localVendorPayments, setLocalVendorPayments] = useState(vendorPayments)
+  const invoiceInputRef = useRef<HTMLInputElement>(null)
+  const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
+
+  async function uploadInvoice(paymentId: string, file: File) {
+    setInvoiceUploading(paymentId)
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch(`/api/vendor-payments/${paymentId}`, { method: 'PATCH', body: fd })
+    if (res.ok) {
+      const data = await res.json()
+      setLocalVendorPayments(prev => prev.map(p =>
+        p.id === paymentId
+          ? { ...p, status: 'invoice_received', invoice_url: data.invoice_url, invoice_received_at: new Date().toISOString() }
+          : p
+      ))
+    }
+    setInvoiceUploading(null)
+    router.refresh()
+  }
+
+  function triggerInvoiceUpload(paymentId: string) {
+    setPendingInvoiceId(paymentId)
+    invoiceInputRef.current?.click()
+  }
 
   // Summaries
   const clientTotal = payments.reduce((s, p) => s + p.amount, 0)
   const clientReceived = payments.filter(p => p.status === 'received').reduce((s, p) => s + p.amount, 0)
-  const vendorTotal = vendorPayments.reduce((s, p) => s + p.amount, 0)
-  const vendorPaid = vendorPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
+  const vendorTotal = localVendorPayments.reduce((s, p) => s + p.amount, 0)
+  const vendorPaid = localVendorPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
 
-  async function addClientPayment(e: React.FormEvent) {
+  async function addClientPayment(e: React.SyntheticEvent) {
     e.preventDefault()
     setLoading(true)
     await supabase.from('payments').insert({
@@ -76,18 +105,23 @@ export default function PaymentTracker({ eventId, payments, vendorPayments, vend
     setLoading(false)
   }
 
-  async function addVendorPayment(e: React.FormEvent) {
+  async function addVendorPayment(e: React.SyntheticEvent) {
     e.preventDefault()
     setLoading(true)
-    await supabase.from('vendor_payments').insert({
-      event_id: eventId,
-      vendor_id: vendorForm.vendor_id,
-      label: vendorForm.label || null,
-      amount: parseFloat(vendorForm.amount),
-      due_date: vendorForm.due_date || null,
-      notes: vendorForm.notes || null,
-      status: 'pending',
-    })
+    const { data: newRow } = await supabase
+      .from('vendor_payments')
+      .insert({
+        event_id: eventId,
+        vendor_id: vendorForm.vendor_id,
+        label: vendorForm.label || null,
+        amount: parseFloat(vendorForm.amount),
+        due_date: vendorForm.due_date || null,
+        notes: vendorForm.notes || null,
+        status: 'pending',
+      })
+      .select('*, vendors(name, category)')
+      .single()
+    if (newRow) setLocalVendorPayments(prev => [...prev, newRow as VendorPayment])
     setVendorForm({ vendor_id: '', label: '', amount: '', due_date: '', notes: '' })
     setShowVendorForm(false)
     router.refresh()
@@ -106,10 +140,14 @@ export default function PaymentTracker({ eventId, payments, vendorPayments, vend
 
   async function markVendorPayment(id: string, status: 'paid' | 'overdue') {
     setMarking(id)
-    await supabase.from('vendor_payments').update({
-      status,
-      paid_date: status === 'paid' ? new Date().toISOString().split('T')[0] : null,
-    }).eq('id', id)
+    await fetch(`/api/vendor-payments/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    })
+    setLocalVendorPayments(prev => prev.map(p =>
+      p.id === id ? { ...p, status, paid_date: status === 'paid' ? new Date().toISOString().split('T')[0] : p.paid_date } : p
+    ))
     router.refresh()
     setMarking(null)
   }
@@ -228,14 +266,25 @@ export default function PaymentTracker({ eventId, payments, vendorPayments, vend
       {/* VENDOR PAYMENTS TAB */}
       {tab === 'vendor' && (
         <div>
-          {/* Decoupling notice — always visible */}
+          {/* Hidden invoice file input */}
+          <input
+            ref={invoiceInputRef}
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,.webp"
+            className="hidden"
+            onChange={e => {
+              const file = e.target.files?.[0]
+              if (file && pendingInvoiceId) uploadInvoice(pendingInvoiceId, file)
+              e.target.value = ''
+            }}
+          />
+
           <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 mb-4 flex items-start gap-3">
             <span className="text-amber-500 mt-0.5 text-lg">⚡</span>
             <div>
-              <p className="text-gray-300 text-xs font-semibold">Vendor payments are director-controlled</p>
+              <p className="text-gray-300 text-xs font-semibold">Invoice → Payment flow</p>
               <p className="text-gray-500 text-xs mt-0.5">
-                Pay vendors whenever funds are available — completely independent of client receipts.
-                Late client payment or re-allocation of funds does not affect this.
+                Accounts uploads vendor invoice → Director releases payment. Independent of client receipts.
               </p>
             </div>
           </div>
@@ -243,14 +292,14 @@ export default function PaymentTracker({ eventId, payments, vendorPayments, vend
           {isDirector && (
             <div className="flex justify-end mb-4">
               <button onClick={() => setShowVendorForm(!showVendorForm)} className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-black font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors">
-                <Plus size={16} /> Pay Vendor
+                <Plus size={16} /> Add Vendor Payment
               </button>
             </div>
           )}
 
           {showVendorForm && (
             <form onSubmit={addVendorPayment} className="bg-gray-900 border border-amber-700/40 rounded-2xl p-5 mb-4 space-y-3">
-              <h3 className="text-white font-semibold text-sm">Pay Vendor</h3>
+              <h3 className="text-white font-semibold text-sm">Add Vendor Payment</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Vendor *</label>
@@ -270,13 +319,13 @@ export default function PaymentTracker({ eventId, payments, vendorPayments, vend
                   <input type="number" value={vendorForm.amount} onChange={e => setVendorForm(f => ({ ...f, amount: e.target.value }))} required placeholder="0" className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Date (leave blank if future)</label>
+                  <label className="block text-xs text-gray-500 mb-1">Due Date</label>
                   <input type="date" value={vendorForm.due_date} onChange={e => setVendorForm(f => ({ ...f, due_date: e.target.value }))} className={inputClass} />
                 </div>
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Notes</label>
-                <input type="text" value={vendorForm.notes} onChange={e => setVendorForm(f => ({ ...f, notes: e.target.value }))} placeholder="Internal reference, mode of payment, etc." className={inputClass} />
+                <input type="text" value={vendorForm.notes} onChange={e => setVendorForm(f => ({ ...f, notes: e.target.value }))} placeholder="Internal reference, payment mode, etc." className={inputClass} />
               </div>
               <div className="flex gap-2">
                 <button type="button" onClick={() => setShowVendorForm(false)} className="flex-1 bg-gray-800 text-gray-400 rounded-xl py-2.5 text-sm">Cancel</button>
@@ -285,30 +334,66 @@ export default function PaymentTracker({ eventId, payments, vendorPayments, vend
             </form>
           )}
 
-          {vendorPayments.length === 0 ? (
+          {localVendorPayments.length === 0 ? (
             <EmptyState icon={<ArrowUpCircle size={28} />} text="No vendor payments tracked yet" />
           ) : (
             <div className="space-y-2">
-              {vendorPayments.map(p => (
-                <PaymentCard
-                  key={p.id}
-                  title={p.vendors?.name || 'Unknown Vendor'}
-                  badge="bg-gray-800 text-gray-400"
-                  badgeText={p.vendors?.category}
-                  subtitle={p.label}
-                  amount={p.amount}
-                  status={p.status}
-                  statusColor={p.status === 'paid' ? 'text-green-400' : p.status === 'overdue' ? 'text-red-400' : 'text-gray-400'}
-                  date={p.paid_date ? `Paid: ${fmt(p.paid_date)}` : p.due_date ? `Due: ${fmt(p.due_date)}` : undefined}
-                  notes={p.notes}
-                  actions={isDirector && p.status === 'pending' ? (
-                    <div className="flex gap-2">
-                      <button onClick={() => markVendorPayment(p.id, 'overdue')} disabled={marking === p.id} className="text-xs bg-red-950 hover:bg-red-900 text-red-400 px-3 py-1.5 rounded-lg">Overdue</button>
-                      <button onClick={() => markVendorPayment(p.id, 'paid')} disabled={marking === p.id} className="text-xs bg-green-950 hover:bg-green-900 text-green-400 px-3 py-1.5 rounded-lg">Mark Paid</button>
+              {localVendorPayments.map(p => {
+                const statusColor = p.status === 'paid' ? 'text-green-400' : p.status === 'overdue' ? 'text-red-400' : p.status === 'invoice_received' ? 'text-blue-400' : 'text-gray-400'
+                const dateStr = p.paid_date ? `Paid: ${fmt(p.paid_date)}` : p.due_date ? `Due: ${fmt(p.due_date)}` : undefined
+                return (
+                  <div key={p.id} className={`bg-gray-900 border rounded-2xl p-4 ${p.status === 'paid' ? 'border-green-900/30' : p.status === 'overdue' ? 'border-red-900/30' : p.status === 'invoice_received' ? 'border-blue-900/30' : 'border-gray-800'}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          {p.status === 'paid' ? <CheckCircle2 size={14} className="text-green-400" /> : p.status === 'overdue' ? <AlertCircle size={14} className="text-red-400" /> : <Clock size={14} className="text-gray-400" />}
+                          <span className="text-white font-semibold">₹{p.amount.toLocaleString('en-IN')}</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-400">{p.vendors?.name || 'Unknown'}</span>
+                          {p.vendors?.category && <span className="text-xs text-gray-600">{p.vendors.category}</span>}
+                          <span className={`text-xs capitalize ${statusColor}`}>{p.status.replace('_', ' ')}</span>
+                        </div>
+                        {p.label && <p className="text-gray-400 text-xs font-medium mb-0.5">{p.label}</p>}
+                        {dateStr && <p className="text-gray-500 text-xs">{dateStr}</p>}
+                        {p.notes && <p className="text-gray-600 text-xs">{p.notes}</p>}
+                        {p.invoice_url && (
+                          <a href={p.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 mt-1">
+                            <FileText size={11} /> View Invoice <ExternalLink size={10} />
+                          </a>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1.5 flex-shrink-0">
+                        {/* Accounts: upload invoice for pending payments */}
+                        {isAccounts && p.status === 'pending' && (
+                          <button
+                            onClick={() => triggerInvoiceUpload(p.id)}
+                            disabled={invoiceUploading === p.id}
+                            className="flex items-center gap-1 text-xs bg-blue-950 hover:bg-blue-900 text-blue-400 px-3 py-1.5 rounded-lg disabled:opacity-50"
+                          >
+                            <Upload size={11} /> {invoiceUploading === p.id ? 'Uploading…' : 'Upload Invoice'}
+                          </button>
+                        )}
+                        {/* Director: release payment once invoice received */}
+                        {isDirector && p.status === 'invoice_received' && (
+                          <button
+                            onClick={() => markVendorPayment(p.id, 'paid')}
+                            disabled={marking === p.id}
+                            className="text-xs bg-green-950 hover:bg-green-900 text-green-400 px-3 py-1.5 rounded-lg disabled:opacity-50"
+                          >
+                            {marking === p.id ? 'Releasing…' : 'Release Payment'}
+                          </button>
+                        )}
+                        {/* Director: mark overdue or pay directly if no invoice flow */}
+                        {isDirector && p.status === 'pending' && (
+                          <div className="flex gap-1.5">
+                            <button onClick={() => markVendorPayment(p.id, 'overdue')} disabled={marking === p.id} className="text-xs bg-red-950 hover:bg-red-900 text-red-400 px-2 py-1.5 rounded-lg">Overdue</button>
+                            <button onClick={() => markVendorPayment(p.id, 'paid')} disabled={marking === p.id} className="text-xs bg-green-950 hover:bg-green-900 text-green-400 px-2 py-1.5 rounded-lg">Pay</button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  ) : undefined}
-                />
-              ))}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

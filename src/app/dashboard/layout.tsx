@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/Sidebar'
+import AIChatPanel from '@/components/AIChatPanel'
 import { Profile } from '@/lib/types'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +24,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <main className="flex-1 md:ml-56 pt-16 md:pt-0 p-4 md:p-6 min-h-screen">
         {children}
       </main>
+      <AIChatPanel userRole={profile.role} userName={profile.name}  />
     </div>
   )
 }

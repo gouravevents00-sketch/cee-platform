@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/morning-briefing",
+      "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/pre-event-alerts",
+      "schedule": "45 3 * * *"
+    }
+  ]
+}

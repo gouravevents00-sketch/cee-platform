@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
   Plus, Trash2, Printer, Save, Send, Download, Upload, ListPlus,
-  Lock, Wand2, ChevronDown, ChevronUp, Eye, EyeOff, CheckCircle2,
+  Lock, Wand2, ChevronDown, ChevronUp, Eye, EyeOff, CheckCircle2, Copy, Check,
 } from 'lucide-react'
 
 // ══════════════════════════════════════════════════════════════════
@@ -241,6 +241,11 @@ export default function QuotationBuilder({
   const [showAI, setShowAI] = useState(false)
   const [aiBrief, setAiBrief] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
+  const [ratesFilling, setRatesFilling] = useState(false)
+  const [ratesFillNote, setRatesFillNote] = useState('')
+  const [shareLink, setShareLink] = useState('')
+  const [shareCopied, setShareCopied] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const [showVendorCol, setShowVendorCol] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const aiFileRef = useRef<HTMLInputElement>(null)
@@ -367,6 +372,61 @@ export default function QuotationBuilder({
     }
     setLocking(false)
     router.refresh()
+  }
+
+  // ── Share with Client ──────────────────────────────────────────
+  async function handleShare() {
+    if (!quoteId) { alert('Save the quotation first.'); return }
+    setSharing(true)
+    const res = await fetch(`/api/quotations/${quoteId}/share`, { method: 'POST' })
+    const data = await res.json()
+    if (data.link) setShareLink(data.link)
+    setSharing(false)
+  }
+
+  async function copyShareLink() {
+    await navigator.clipboard.writeText(shareLink)
+    setShareCopied(true)
+    setTimeout(() => setShareCopied(false), 2000)
+  }
+
+  // ── AI Rate Fill ───────────────────────────────────────────────
+  async function handleFillRates() {
+    const priceable = rows.filter(r => r._type === 'item' && r.description?.trim() && !r.is_lumpsum)
+    if (!priceable.length) return
+    setRatesFilling(true)
+    setRatesFillNote('')
+    try {
+      const res = await fetch('/api/ai/fill-rates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows }),
+      })
+      const data = await res.json()
+      if (data.suggestions?.length) {
+        // Map suggestions back onto rows by index position among item rows
+        const itemIndices: number[] = []
+        rows.forEach((r, i) => { if (r._type === 'item' && r.description?.trim() && !r.is_lumpsum) itemIndices.push(i) })
+        setRows(prev => {
+          const next = [...prev]
+          data.suggestions.forEach((s: any) => {
+            const rowIdx = itemIndices[s.index - 1]
+            if (rowIdx === undefined) return
+            next[rowIdx] = { ...next[rowIdx], rate: s.client_rate || next[rowIdx].rate, vendor_rate: s.vendor_rate || next[rowIdx].vendor_rate }
+          })
+          return next
+        })
+        setRatesFillNote(`AI filled rates for ${data.suggestions.length} items. Review and adjust before saving.`)
+        setTimeout(() => setRatesFillNote(''), 5000)
+      } else {
+        setRatesFillNote(data.error || 'No rate suggestions returned.')
+        setTimeout(() => setRatesFillNote(''), 4000)
+      }
+    } catch {
+      setRatesFillNote('Rate fill failed — check connection.')
+      setTimeout(() => setRatesFillNote(''), 4000)
+    }
+    setRatesFilling(false)
   }
 
   // ── AI Brief Parser ────────────────────────────────────────────
@@ -596,11 +656,23 @@ export default function QuotationBuilder({
 
         {/* Right side tools */}
         <div className="flex items-center gap-2 ml-auto">
-          {/* AI Brief */}
+          {/* AI Parse Brief */}
           {canEdit && !lockDone && (
             <button onClick={() => setShowAI(v => !v)}
               className="flex items-center gap-1.5 bg-purple-950 hover:bg-purple-900 text-purple-400 text-sm px-4 py-2 rounded-xl transition-colors">
               <Wand2 size={13} /> AI Parse
+            </button>
+          )}
+
+          {/* AI Fill Rates */}
+          {isDirector && !lockDone && rows.some(r => r._type === 'item' && r.description?.trim() && !r.is_lumpsum) && (
+            <button
+              onClick={handleFillRates}
+              disabled={ratesFilling}
+              className="flex items-center gap-1.5 bg-green-950 hover:bg-green-900 text-green-400 text-sm px-4 py-2 rounded-xl transition-colors disabled:opacity-50"
+              title="AI suggests rates from historical quotations"
+            >
+              <Wand2 size={13} /> {ratesFilling ? 'Filling…' : 'AI Fill Rates'}
             </button>
           )}
 
@@ -634,6 +706,28 @@ export default function QuotationBuilder({
           )}
           <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
 
+          {/* Share with client */}
+          {isDirector && quoteId && (
+            shareLink ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  readOnly value={shareLink}
+                  className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-gray-300 text-xs w-48 focus:outline-none"
+                  onFocus={e => e.target.select()}
+                />
+                <button onClick={copyShareLink}
+                  className="flex items-center gap-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs px-3 py-2 rounded-xl transition-colors flex-shrink-0">
+                  {shareCopied ? <><Check size={11} className="text-green-400" /> Copied</> : <><Copy size={11} /> Copy</>}
+                </button>
+              </div>
+            ) : (
+              <button onClick={handleShare} disabled={sharing}
+                className="flex items-center gap-1.5 bg-blue-950 hover:bg-blue-900 text-blue-400 text-sm px-4 py-2 rounded-xl transition-colors disabled:opacity-50">
+                <Send size={13} /> {sharing ? 'Generating…' : 'Share with Client'}
+              </button>
+            )
+          )}
+
           {/* Print buttons */}
           <button onClick={() => handlePrint('client')}
             className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-black font-semibold text-sm px-4 py-2 rounded-xl transition-colors">
@@ -647,6 +741,13 @@ export default function QuotationBuilder({
           )}
         </div>
       </div>
+
+      {/* ── AI RATE FILL FEEDBACK ───────────────────────────────── */}
+      {ratesFillNote && (
+        <div className="bg-green-950 border border-green-800/50 rounded-xl px-4 py-2.5 text-green-400 text-xs print:hidden">
+          {ratesFillNote}
+        </div>
+      )}
 
       {/* ── AI BRIEF PARSER ─────────────────────────────────────── */}
       {showAI && (

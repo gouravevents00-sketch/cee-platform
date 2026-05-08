@@ -8,6 +8,7 @@ import RequestApprovalButton from '@/components/RequestApprovalButton'
 import ActivityLog from '@/components/ActivityLog'
 import ReviewRequest from '@/components/ReviewRequest'
 import PortalLinkGenerator from '@/components/PortalLinkGenerator'
+import BriefLinkGenerator from '@/components/BriefLinkGenerator'
 import SaveAsTemplate from '@/components/SaveAsTemplate'
 import EventDateEditor from '@/components/EventDateEditor'
 import EmergencyPOCReplace from '@/components/EmergencyPOCReplace'
@@ -176,6 +177,19 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           <div className="mt-3 pt-3 border-t border-gray-800 flex justify-end">
             <SaveAsTemplate eventId={id} eventName={event.name} />
           </div>
+        )}
+
+        {/* Brief Link Generator — director only */}
+        {isDirector && (
+          <BriefLinkGenerator
+            eventId={id}
+            clientName={event.clients?.contact_name || event.clients?.name}
+            clientPhone={event.clients?.contact_phone}
+            clientEmail={event.clients?.contact_email}
+            eventType={event.type}
+            eventDate={event.event_date}
+            city={event.city}
+          />
         )}
 
         {/* Portal Link Generator — director only */}

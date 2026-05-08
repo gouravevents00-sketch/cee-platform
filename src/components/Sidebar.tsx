@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, CalendarDays, CheckSquare, Receipt, LogOut, Users, Building2, Truck, Menu, X, Share2, Sparkles, Bell, Star, Hammer, Package, Calendar, ListTodo, TrendingUp } from 'lucide-react'
+import { LayoutDashboard, CalendarDays, CheckSquare, Receipt, LogOut, Users, Building2, Truck, Menu, X, Share2, Sparkles, Bell, Star, Hammer, Package, Calendar, ListTodo, TrendingUp, BarChart2, Trophy, IndianRupee } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Profile, ROLE_LABELS } from '@/lib/types'
 import NotificationBell from './NotificationBell'
@@ -20,6 +20,7 @@ export default function Sidebar({ profile }: SidebarProps) {
 
   const isDirector = profile.role === 'director'
   const isAccounts = profile.role === 'accounts'
+  const isAdmin = profile.role === 'admin'
 
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, show: true },
@@ -28,16 +29,19 @@ export default function Sidebar({ profile }: SidebarProps) {
     { href: '/dashboard/my-tasks', label: 'My Tasks', icon: ListTodo, show: !isDirector },
     { href: '/dashboard/approvals', label: 'Approvals', icon: CheckSquare, show: isDirector },
     { href: '/dashboard/expenses', label: 'Expenses', icon: Receipt, show: isDirector || isAccounts || profile.role === 'poc' },
-    { href: '/dashboard/clients', label: 'Clients', icon: Building2, show: isDirector || isAccounts },
-    { href: '/dashboard/vendors', label: 'Vendors', icon: Truck, show: isDirector || isAccounts },
+    { href: '/dashboard/clients', label: 'Clients', icon: Building2, show: isDirector || isAccounts || isAdmin },
+    { href: '/dashboard/vendors', label: 'Vendors', icon: Truck, show: isDirector || isAccounts || isAdmin },
+    { href: '/dashboard/progress', label: 'Progress', icon: BarChart2, show: isDirector },
     { href: '/dashboard/team', label: 'Team', icon: Users, show: isDirector },
-    { href: '/dashboard/social', label: 'Social Media', icon: Share2, show: isDirector || profile.role === 'design' || profile.role === 'admin' },
-    { href: '/dashboard/followup', label: 'Follow-Up', icon: Bell, show: isDirector || isAccounts },
+    { href: '/dashboard/social', label: 'Social Media', icon: Share2, show: isDirector || profile.role === 'design' || isAdmin },
+    { href: '/dashboard/followup', label: 'Follow-Up', icon: Bell, show: isDirector || isAccounts || isAdmin },
     { href: '/dashboard/goldmine', label: 'Goldmine', icon: Star, show: isDirector },
-    { href: '/dashboard/experiences', label: 'Experiences', icon: Sparkles, show: isDirector || profile.role === 'admin' || profile.role === 'poc' },
-    { href: '/dashboard/production', label: 'Production', icon: Hammer, show: isDirector || profile.role === 'admin' || isAccounts },
-    { href: '/dashboard/inventory', label: 'Inventory', icon: Package, show: isDirector || profile.role === 'admin' },
-    { href: '/dashboard/sales', label: 'Sales', icon: TrendingUp, show: isDirector || profile.role === 'admin' },
+    { href: '/dashboard/experiences', label: 'Experiences', icon: Sparkles, show: isDirector || isAdmin || profile.role === 'poc' },
+    { href: '/dashboard/production', label: 'Production', icon: Hammer, show: isDirector || isAdmin || isAccounts },
+    { href: '/dashboard/inventory', label: 'Inventory', icon: Package, show: isDirector || isAdmin },
+    { href: '/dashboard/sales', label: 'Sales', icon: TrendingUp, show: isDirector || isAdmin },
+    { href: '/dashboard/rates', label: 'Rate Master', icon: IndianRupee, show: isDirector || isAccounts },
+    { href: '/dashboard/leaderboard', label: 'CEEstar', icon: Trophy, show: true },
   ].filter(item => item.show)
 
   async function handleLogout() {

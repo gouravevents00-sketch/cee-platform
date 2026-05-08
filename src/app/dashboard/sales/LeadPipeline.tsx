@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Trash2, Phone, Mail, IndianRupee, Calendar, ChevronDown, ArrowRight, Trophy } from 'lucide-react'
+import LeadInteractions from './LeadInteractions'
 
 const STATUSES = [
   { key: 'new',            label: 'New',            color: 'bg-gray-800 text-gray-300',        dot: 'bg-gray-500' },
@@ -291,6 +292,8 @@ export default function LeadPipeline({ leads, profiles, clients, userId, isDirec
                       onChange={e => updateLead(lead.id, { follow_up_date: e.target.value || null })}
                     />
                   </div>
+
+                  <LeadInteractions leadId={lead.id} />
 
                   {/* Delete */}
                   {isDirector && (

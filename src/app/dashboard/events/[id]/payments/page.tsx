@@ -45,6 +45,7 @@ export default async function PaymentsPage({ params }: { params: Promise<{ id: s
         vendorPayments={vendorPayments || []}
         vendors={vendors || []}
         isDirector={profile.role === 'director'}
+        isAccounts={profile.role === 'accounts'}
       />
     </div>
   )
