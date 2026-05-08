@@ -2,6 +2,7 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
+import NextImage from 'next/image'
 import { Camera, RefreshCw, Download, MessageCircle, Settings, Play, X } from 'lucide-react'
 
 type Stage = 'setup' | 'idle' | 'countdown' | 'captured' | 'processing' | 'result' | 'error'
@@ -263,11 +264,15 @@ export default function PhotoBooth() {
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-gray-950 px-6">
         <div className="w-full max-w-sm space-y-6">
           <div className="text-center mb-2">
-            <div className="w-14 h-14 rounded-2xl bg-amber-500 flex items-center justify-center mx-auto mb-3">
-              <Camera size={26} className="text-black" />
-            </div>
+            <NextImage
+              src="/cee-logo.png"
+              alt="Creative Era Experiences"
+              width={160}
+              height={54}
+              className="object-contain mx-auto mb-4"
+              priority
+            />
             <h1 className="text-white text-2xl font-bold">AI Photo Booth</h1>
-            <p className="text-gray-500 text-sm mt-1">Creative Era Experiences</p>
           </div>
 
           <div className="space-y-4">
@@ -377,9 +382,14 @@ export default function PhotoBooth() {
           </button>
 
           <div className="text-center">
-            <p className="text-gray-600 text-xs font-medium uppercase tracking-widest mb-2">
-              Creative Era Experiences
-            </p>
+            <NextImage
+              src="/cee-logo.png"
+              alt="Creative Era Experiences"
+              width={180}
+              height={60}
+              className="object-contain mx-auto mb-3"
+              priority
+            />
             {eventName && <p className="text-gray-400 text-base mb-1">{eventName}</p>}
             <h1 className="text-white text-4xl font-bold">AI Photo Booth</h1>
           </div>
@@ -592,7 +602,9 @@ export default function PhotoBooth() {
             </button>
           </div>
 
-          <p className="text-gray-700 text-xs absolute bottom-3">Creative Era Experiences</p>
+          <div className="absolute bottom-3">
+            <NextImage src="/cee-logo.png" alt="Creative Era Experiences" width={80} height={27} className="object-contain opacity-30" />
+          </div>
         </div>
       )}
 

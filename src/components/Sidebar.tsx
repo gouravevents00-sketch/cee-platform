@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, CalendarDays, CheckSquare, Receipt, LogOut, Users, Building2, Truck, Menu, X, Share2, Sparkles, Bell, Star, Hammer, Package, Calendar, ListTodo, TrendingUp, BarChart2, Trophy, IndianRupee } from 'lucide-react'
+import { LayoutDashboard, CalendarDays, CheckSquare, Receipt, LogOut, Users, Building2, Truck, Menu, X, Share2, Sparkles, Bell, Star, Hammer, Package, Calendar, ListTodo, TrendingUp, BarChart2, Trophy, IndianRupee, FileText } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Profile, ROLE_LABELS } from '@/lib/types'
 import NotificationBell from './NotificationBell'
@@ -40,6 +41,7 @@ export default function Sidebar({ profile }: SidebarProps) {
     { href: '/dashboard/production', label: 'Production', icon: Hammer, show: isDirector || isAdmin || isAccounts },
     { href: '/dashboard/inventory', label: 'Inventory', icon: Package, show: isDirector || isAdmin },
     { href: '/dashboard/sales', label: 'Sales', icon: TrendingUp, show: isDirector || isAdmin },
+    { href: '/dashboard/quotations', label: 'Quotations', icon: FileText, show: isDirector || isAccounts || isAdmin },
     { href: '/dashboard/rates', label: 'Rate Master', icon: IndianRupee, show: isDirector || isAccounts },
     { href: '/dashboard/leaderboard', label: 'CEEstar', icon: Trophy, show: true },
   ].filter(item => item.show)
@@ -54,14 +56,15 @@ export default function Sidebar({ profile }: SidebarProps) {
     <>
       {/* Logo */}
       <div className="p-5 border-b border-gray-900 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center flex-shrink-0">
-            <span className="text-xs font-black text-black">CE</span>
-          </div>
-          <div>
-            <p className="text-white text-sm font-bold leading-tight">Creative Era</p>
-            <p className="text-gray-500 text-xs">Events Platform</p>
-          </div>
+        <div className="flex items-center">
+          <Image
+            src="/cee-logo.png"
+            alt="Creative Era Experiences"
+            width={120}
+            height={40}
+            className="object-contain"
+            priority
+          />
         </div>
         <button onClick={() => setMobileOpen(false)} className="md:hidden text-gray-500 hover:text-white">
           <X size={18} />
