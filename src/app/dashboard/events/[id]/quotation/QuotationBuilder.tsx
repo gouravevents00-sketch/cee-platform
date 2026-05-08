@@ -251,6 +251,7 @@ export default function QuotationBuilder({
   const [saving, setSaving] = useState(false)
   const [locking, setLocking] = useState(false)
   const [lockDone, setLockDone] = useState(isLocked)
+  const [lockResult, setLockResult] = useState<{ elementsCreated: number; vendorSOsCreated: number; milestonesCreated: number } | null>(null)
   const [showMilestones, setShowMilestones] = useState(true)
   const [showCompliance, setShowCompliance] = useState(false)
   const [showAI, setShowAI] = useState(false)
@@ -377,17 +378,28 @@ export default function QuotationBuilder({
   // ── Lock ───────────────────────────────────────────────────────
   async function handleLock() {
     if (!isDirector || !quoteId) return
-    if (!confirm('Lock this quotation? This will:\n• Generate element sheet with vendor assignments\n• Create payment milestones\n• Set event to Active\n• Notify team\n\nThis cannot be undone.')) return
+    const itemCount = rows.filter(r => r._type === 'item' && r.description?.trim()).length
+    if (itemCount === 0) {
+      alert('Quotation has no items. Add elements before locking.')
+      return
+    }
+    if (!confirm(`Lock this quotation?\n\n• ${itemCount} elements will be generated\n• Payment milestones will be created\n• Vendor SOs will be generated\n• Event will be set to Active\n• Team will be notified\n\nThis cannot be undone.`)) return
 
     setLocking(true)
-    await save() // save latest state first
+    await save()
     const res = await fetch(`/api/quotations/${quoteId}/lock`, { method: 'POST' })
+    const data = await res.json()
     if (res.ok) {
       setLockDone(true)
       setStatus('accepted')
+      setLockResult({ elementsCreated: data.elementsCreated ?? 0, vendorSOsCreated: data.vendorSOsCreated ?? 0, milestonesCreated: data.milestonesCreated ?? 0 })
+      if (data.elementError) {
+        alert(`Warning: Elements could not be saved.\nError: ${data.elementError}\n\nPlease contact support or check Supabase RLS policies on the elements table.`)
+      } else if (data.itemRowsFound > 0 && data.elementsCreated === 0) {
+        alert(`Warning: ${data.itemRowsFound} items found but 0 elements were created. Check elements table permissions.`)
+      }
     } else {
-      const err = await res.json()
-      alert(err.error || 'Lock failed')
+      alert(data.error || 'Lock failed')
     }
     setLocking(false)
     router.refresh()
@@ -688,7 +700,10 @@ export default function QuotationBuilder({
 
         {lockDone && (
           <span className="flex items-center gap-1.5 text-green-400 text-xs">
-            <CheckCircle2 size={13} /> Elements &amp; tasks generated
+            <CheckCircle2 size={13} />
+            {lockResult
+              ? `${lockResult.elementsCreated} elements · ${lockResult.vendorSOsCreated} SOs · ${lockResult.milestonesCreated} milestones created`
+              : 'Locked — elements & tasks generated'}
           </span>
         )}
 

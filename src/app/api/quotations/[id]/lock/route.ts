@@ -48,6 +48,7 @@ export async function POST(
   // ── 2. Generate elements from quotation rows ──────────────────
   const itemRows = rows.filter((r: any) => r._type === 'item' && r.description?.trim())
   let insertedElements: any[] = []
+  let elementError: string | null = null
   if (itemRows.length > 0) {
     const elementsToInsert = itemRows.map((r: any) => ({
       event_id: eventId,
@@ -63,7 +64,8 @@ export async function POST(
         : null,
       status: 'pending',
     }))
-    const { data: els } = await supabase.from('elements').insert(elementsToInsert).select()
+    const { data: els, error: elErr } = await supabase.from('elements').insert(elementsToInsert).select()
+    if (elErr) elementError = elErr.message
     insertedElements = els || []
   }
 
@@ -224,8 +226,10 @@ export async function POST(
   return NextResponse.json({
     success: true,
     eventId,
+    itemRowsFound: itemRows.length,
     elementsCreated: insertedElements.length,
     vendorSOsCreated: vendorMap.size,
     milestonesCreated: milestones.filter((m: any) => m.percent > 0).length,
+    elementError,
   })
 }
