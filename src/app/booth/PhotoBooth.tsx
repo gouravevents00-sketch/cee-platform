@@ -45,6 +45,9 @@ export default function PhotoBooth() {
   const searchParams = useSearchParams()
   const [eventName, setEventName]       = useState(() => searchParams.get('event') ?? '')
   const [eventType, setEventType]       = useState<EventType>(() => (searchParams.get('type') as EventType) ?? 'corporate')
+  const [brandColor, setBrandColor]     = useState('#f59e0b')
+  const [logoDataUrl, setLogoDataUrl]   = useState<string | null>(null)
+  const [frameText, setFrameText]       = useState('')
 
   const startCamera = useCallback(async () => {
     try {
@@ -183,19 +186,70 @@ export default function PhotoBooth() {
     setStage('setup')
   }, [stopCamera])
 
+  const handleLogoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => setLogoDataUrl(ev.target?.result as string)
+    reader.readAsDataURL(file)
+  }, [])
+
   const shareWhatsApp = useCallback(() => {
     if (!resultUrl) return
     const text = `Your photo from ${eventName || 'the event'}! 📸\n${resultUrl}`
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
   }, [resultUrl, eventName])
 
-  const downloadPhoto = useCallback(() => {
+  // Download with branded frame composited via Canvas
+  const downloadPhoto = useCallback(async () => {
     if (!resultUrl) return
-    const a = document.createElement('a')
-    a.href = resultUrl
-    a.download = `cee-photo-${Date.now()}.jpg`
-    a.click()
-  }, [resultUrl])
+    const canvas = document.createElement('canvas')
+    const size = 768
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')!
+
+    // Draw result photo
+    await new Promise<void>(resolve => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => { ctx.drawImage(img, 0, 0, size, size); resolve() }
+      img.src = resultUrl
+    })
+
+    // Draw logo top-left
+    if (logoDataUrl) {
+      await new Promise<void>(resolve => {
+        const logo = new Image()
+        logo.onload = () => {
+          const lw = 100, lh = 100
+          ctx.globalAlpha = 0.92
+          ctx.drawImage(logo, 12, 12, lw, lh)
+          ctx.globalAlpha = 1
+          resolve()
+        }
+        logo.src = logoDataUrl
+      })
+    }
+
+    // Draw frame bar at bottom
+    if (frameText || eventName) {
+      const barH = 44
+      ctx.fillStyle = brandColor
+      ctx.fillRect(0, size - barH, size, barH)
+      ctx.fillStyle = '#ffffff'
+      ctx.font = 'bold 18px system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(frameText || eventName, size / 2, size - barH / 2)
+    }
+
+    // Download
+    const link = document.createElement('a')
+    link.href = canvas.toDataURL('image/jpeg', 0.92)
+    link.download = `cee-photo-${Date.now()}.jpg`
+    link.click()
+  }, [resultUrl, logoDataUrl, brandColor, frameText, eventName])
 
   const filterLabel = FILTERS.find(f => f.id === selectedFilter)?.label ?? ''
 
@@ -243,6 +297,42 @@ export default function PhotoBooth() {
                     {t === 'brand' ? 'Brand Activation' : t.charAt(0).toUpperCase() + t.slice(1)}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* ── Branding ── */}
+            <div className="border-t border-gray-800 pt-4 space-y-3">
+              <p className="text-gray-500 text-xs font-medium uppercase tracking-wider">Client Branding (optional)</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-gray-400 text-xs font-medium block mb-1.5">Brand Color</label>
+                  <div className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-xl px-3 py-2">
+                    <input
+                      type="color"
+                      value={brandColor}
+                      onChange={e => setBrandColor(e.target.value)}
+                      className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0 p-0"
+                    />
+                    <span className="text-gray-400 text-xs font-mono">{brandColor}</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-xs font-medium block mb-1.5">Client Logo</label>
+                  <label className="flex items-center justify-center gap-2 bg-gray-900 border border-gray-800 hover:border-gray-600 rounded-xl px-3 py-2.5 cursor-pointer transition-colors">
+                    <span className="text-gray-400 text-xs">{logoDataUrl ? '✓ Uploaded' : 'Upload PNG/JPG'}</span>
+                    <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                  </label>
+                </div>
+              </div>
+              <div>
+                <label className="text-gray-400 text-xs font-medium block mb-1.5">Frame Text (bottom of photo)</label>
+                <input
+                  type="text"
+                  value={frameText}
+                  onChange={e => setFrameText(e.target.value)}
+                  placeholder="e.g. Reliance Annual Meet · May 2025"
+                  className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 placeholder-gray-600"
+                />
               </div>
             </div>
           </div>
@@ -441,10 +531,28 @@ export default function PhotoBooth() {
                 {selectedFilter === 'original' ? 'Your Photo' : filterLabel}
               </p>
               <div
-                className={`${selectedFilter === 'original' ? 'w-64 h-64 sm:w-72 sm:h-72' : 'w-52 h-52 sm:w-60 sm:h-60'} rounded-2xl overflow-hidden border-2 border-amber-500/40 shadow-lg shadow-amber-500/10`}
+                className={`${selectedFilter === 'original' ? 'w-64 h-64 sm:w-72 sm:h-72' : 'w-52 h-52 sm:w-60 sm:h-60'} rounded-2xl overflow-hidden border-2 border-amber-500/40 shadow-lg shadow-amber-500/10 relative`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={resultUrl} alt="Result" className="w-full h-full object-cover" />
+                {/* Client logo overlay */}
+                {logoDataUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logoDataUrl}
+                    alt="Brand logo"
+                    className="absolute top-2 left-2 w-10 h-10 object-contain opacity-90"
+                  />
+                )}
+                {/* Frame text bar */}
+                {(frameText || eventName) && (
+                  <div
+                    className="absolute bottom-0 left-0 right-0 text-white text-center text-xs font-semibold py-1.5 px-2 truncate"
+                    style={{ backgroundColor: brandColor }}
+                  >
+                    {frameText || eventName}
+                  </div>
+                )}
               </div>
             </div>
           </div>
