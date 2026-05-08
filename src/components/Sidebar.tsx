@@ -97,7 +97,7 @@ export default function Sidebar({ profile }: SidebarProps) {
             <p className="text-white text-sm font-medium truncate">{profile.name}</p>
             <p className="text-gray-500 text-xs truncate">{ROLE_LABELS[profile.role]}</p>
           </div>
-          <NotificationBell userId={profile.id} />
+          <NotificationBell userId={profile.id} openUpward />
         </div>
         <button
           onClick={handleLogout}

@@ -14,7 +14,7 @@ interface Notification {
   created_at: string
 }
 
-export default function NotificationBell({ userId }: { userId: string }) {
+export default function NotificationBell({ userId, openUpward }: { userId: string; openUpward?: boolean }) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [open, setOpen] = useState(false)
   const supabase = createClient()
@@ -87,7 +87,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-2 w-80 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl z-20 overflow-hidden">
+          <div className={`absolute right-0 w-80 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl z-20 overflow-hidden ${openUpward ? 'bottom-full mb-2' : 'top-full mt-2'}`}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
               <span className="text-white font-semibold text-sm">Notifications</span>
               {unread > 0 && (
