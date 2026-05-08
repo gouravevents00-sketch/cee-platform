@@ -120,13 +120,15 @@ export default async function DashboardPage() {
     : { data: [] }
 
   const firstName = profile.name.split(' ')[0]
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
 
       {/* Header */}
       <div>
-        <h1 className="text-white text-2xl font-bold">Good morning, {firstName}</h1>
+        <h1 className="text-white text-2xl font-bold">{greeting}, {firstName}</h1>
         <p className="text-gray-500 text-sm mt-0.5">
           {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </p>
