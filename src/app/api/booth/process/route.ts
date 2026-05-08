@@ -43,16 +43,12 @@ export async function POST(req: NextRequest) {
     const imageFile = new File([imageBlob], 'photo.jpg', { type: 'image/jpeg' })
     const imageUrl  = await fal.storage.upload(imageFile)
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await fal.subscribe('fal-ai/flux/dev/image-to-image', {
       input: {
         image_url: imageUrl,
         prompt: config.prompt,
         strength: config.strength,
-        num_inference_steps: 8,
-        guidance_scale: 3.5,
-        num_images: 1,
-        enable_safety_checker: false,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any,
       logs: false,
     }) as { data: { images: Array<{ url: string }> } }
@@ -62,11 +58,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ result_url })
   } catch (err: unknown) {
-    console.error('[booth/process]', err)
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Processing failed' },
-      { status: 500 }
-    )
+    const detail = err && typeof err === 'object' && 'body' in err
+      ? JSON.stringify((err as { body: unknown }).body)
+      : err instanceof Error ? err.message : 'Processing failed'
+    console.error('[booth/process]', detail)
+    return NextResponse.json({ error: detail }, { status: 500 })
   }
 }
 
