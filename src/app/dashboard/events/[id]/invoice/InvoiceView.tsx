@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { Printer, Send, CheckCircle2, FileText, Plus, Trash2 } from 'lucide-react'
+import { Printer, Send, CheckCircle2, FileText, Plus, Trash2, MessageCircle, Copy, Check } from 'lucide-react'
 
 // ══════════════════════════════════════════════════════════════════
 // TYPES

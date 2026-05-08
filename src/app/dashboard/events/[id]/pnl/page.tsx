@@ -125,19 +125,19 @@ export default async function PnLPage({ params }: { params: Promise<{ id: string
         />
       </div>
 
-      {/* Vendor Payment Suggestion */}
-      {shouldSuggestVendorPayment && profile.role === 'director' && (
+      {/* Vendor Payment Suggestion — director sees release link, accounts sees request note */}
+      {shouldSuggestVendorPayment && (
         <div className="bg-amber-950/20 border border-amber-900/40 rounded-2xl p-5 mb-4">
           <div className="flex items-center gap-2 mb-3">
             <Lightbulb size={15} className="text-amber-400" />
             <span className="text-amber-400 font-semibold text-sm">Vendor Payment Suggestion</span>
           </div>
           <p className="text-gray-400 text-xs mb-3">
-            You have received {fmt(effectiveReceived)} from the client. Consider releasing payment to pending vendors:
+            Client has paid {fmt(effectiveReceived)} ({effectiveExpected > 0 ? Math.round(effectiveReceived / effectiveExpected * 100) : 0}% of total).
+            Proportional vendor release suggested:
           </p>
           <div className="space-y-2">
             {unpaidVendors.map((vp: any) => {
-              // Suggest proportional payment based on collection %
               const collectionPct = effectiveExpected > 0 ? effectiveReceived / effectiveExpected : 0
               const suggested = Math.round(vp.amount * collectionPct)
               return (
@@ -147,19 +147,32 @@ export default async function PnLPage({ params }: { params: Promise<{ id: string
                     {vp.vendors?.category && <span className="text-gray-600 text-xs ml-1.5">({vp.vendors.category})</span>}
                   </div>
                   <div className="text-right">
-                    <span className="text-white text-sm font-semibold">{fmt(vp.amount)}</span>
-                    {suggested > 0 && suggested < vp.amount && (
-                      <span className="text-amber-400 text-xs ml-2">→ suggest {fmt(suggested)} ({Math.round(collectionPct * 100)}%)</span>
+                    <span className="text-white text-sm font-semibold">{fmt(vp.amount)} due</span>
+                    {suggested > 0 && (
+                      <span className="text-amber-400 text-xs ml-2">
+                        → release {fmt(suggested)} now ({Math.round(collectionPct * 100)}%)
+                      </span>
                     )}
                   </div>
                 </div>
               )
             })}
           </div>
-          <p className="text-gray-600 text-xs mt-3">
-            Go to <Link href={`/dashboard/events/${id}/payments`} className="text-amber-500 hover:text-amber-400">Payments → Vendor tab</Link> to release.
-            Vendor payments are always at your discretion — no automatic release.
-          </p>
+          {profile.role === 'director' ? (
+            <p className="text-gray-600 text-xs mt-3">
+              Go to <Link href={`/dashboard/events/${id}/payments`} className="text-amber-500 hover:text-amber-400">Payments → Vendor tab</Link> to release.
+              No automatic release — always requires your approval.
+            </p>
+          ) : (
+            <div className="mt-3 flex items-start gap-2 bg-blue-950/30 border border-blue-900/30 rounded-xl px-3 py-2.5">
+              <span className="text-blue-400 text-xs mt-0.5">ℹ</span>
+              <p className="text-blue-300 text-xs">
+                Vendor payment release requires Director approval.
+                Share this P&L with Gourav/Abhinav and request release via{' '}
+                <Link href={`/dashboard/events/${id}/payments`} className="text-amber-500 hover:text-amber-400">Payments page</Link>.
+              </p>
+            </div>
+          )}
         </div>
       )}
 

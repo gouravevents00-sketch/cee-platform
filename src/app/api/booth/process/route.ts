@@ -3,48 +3,41 @@ import { fal } from '@fal-ai/client'
 
 fal.config({ credentials: process.env.FAL_KEY })
 
-// Each filter describes a FULL SCENE the person is placed inside.
+// Prompts describe the FULL desired output — outfit + scene + atmosphere.
+// Face is preserved by the PuLID model architecture, not by the prompt.
 // brand_context (operator-supplied) is appended to make every shot event-specific.
-const FILTER_BASE: Record<string, { prompt: string; strength: number }> = {
+const FILTER_CONFIG: Record<string, { prompt: string }> = {
+  bollywood: {
+    prompt:
+      'hyperrealistic Bollywood blockbuster movie poster, person wearing a glamorous shimmering designer outfit, silk kurta or lehenga with gold embroidery, standing in front of a grand illuminated palace entrance with fireworks exploding behind, dramatic warm backlighting, cinematic color grading, 8K photorealistic',
+  },
   neon: {
     prompt:
-      'hyperrealistic cinematic photograph, person standing confidently as the hero of a futuristic cyberpunk megalopolis at night, towering neon skyscrapers with Japanese kanji signs glowing electric pink and cyan, rain-slicked streets reflecting light, volumetric fog, dramatic rim light, Blade Runner 2049 cinematography, 8K ultra detailed, award winning shot, photorealistic',
-    strength: 0.84,
+      'hyperrealistic cyberpunk cinematic photograph, person wearing a sleek black leather jacket with glowing cyan LED strips and tech accents, standing in a futuristic neon-lit megacity at night, massive holographic billboards, rain-slicked reflective streets, Blade Runner 2049 atmosphere, volumetric fog, 8K',
   },
   royal: {
     prompt:
-      'hyperrealistic photographic portrait, person dressed as an Indian Maharaja royalty, wearing an elaborate golden crown, ornate pearl and emerald jewelry, rich brocade sherwani, standing in a grand Mughal palace throne room, marble arches, warm golden sunlight streaming through lattice windows, majestic regal pose, 8K ultra detailed, National Geographic quality photography',
-    strength: 0.82,
+      'hyperrealistic photograph, person dressed as an Indian Maharaja wearing an elaborate gold crown, multi-strand pearl and ruby necklaces, rich brocade silk sherwani with gold zari work, standing in a grand Mughal palace throne room with marble inlay floors and ornate arches, warm golden chandelier light, 8K regal portrait',
   },
   magazine: {
     prompt:
-      'Vogue and GQ magazine cover quality portrait, person styled as an international luxury fashion model, flawless editorial fashion photography, dramatic Rembrandt studio lighting, stark clean background, high fashion designer outfit, perfect retouching, powerful confident pose, hyperrealistic 8K professional photography, industry award winning shot',
-    strength: 0.72,
+      'Vogue and GQ magazine cover quality photograph, person wearing a tailored luxury designer outfit, crisp editorial fashion, stark white seamless studio backdrop, dramatic Rembrandt lighting from one side, powerful confident pose, flawless professional retouching, 8K high fashion editorial',
   },
   scifi: {
     prompt:
-      'hyperrealistic cinematic sci-fi blockbuster movie still, person as the lead protagonist standing heroically in a massive futuristic space station command center, holographic displays surrounding them, electric blue and orange energy trails, volumetric god rays, lens flares, Marvel and DC movie production quality, IMAX cinematography, 8K photorealistic, epic composition',
-    strength: 0.86,
+      'hyperrealistic IMAX sci-fi blockbuster movie still, person wearing sleek white and chrome space commander armor with glowing blue energy lines, standing heroically on the bridge of a massive spaceship overlooking a nebula galaxy, holographic star maps, lens flares, cinematic volumetric lighting, 8K',
   },
   warrior: {
     prompt:
-      'hyperrealistic epic fantasy portrait, person as a legendary warrior standing triumphant on a dramatic clifftop overlooking an ancient kingdom, wearing ornate battle armor with gold and silver filigree, flowing cape, dramatic storm clouds parting with divine god rays, cinematic fantasy art quality, Frank Frazetta inspired, 8K ultra detailed digital painting',
-    strength: 0.85,
-  },
-  bollywood: {
-    prompt:
-      'hyperrealistic Bollywood blockbuster movie poster quality portrait, person as the lead movie star, dramatically lit against a rich deep crimson and gold background with bokeh city lights, volumetric spotlight from above, intense cinematic color grading, film grain, glossy magazine quality retouching, Karan Johar production aesthetic, 8K photorealistic',
-    strength: 0.80,
+      'hyperrealistic epic fantasy portrait, person wearing ornate hand-forged battle armor with gold and silver engravings, a broadsword on their back, standing on a dramatic mountain cliffside overlooking an ancient fantasy kingdom at golden hour, storm clouds parting with divine god rays, 8K digital painting quality',
   },
   ghibli: {
     prompt:
-      'Studio Ghibli masterpiece animation style, person painted as the protagonist in a Hayao Miyazaki film, lush enchanted forest with glowing fireflies and giant ancient trees, golden hour light filtering through leaves, hand-painted watercolor textures, soft dreamy atmosphere, expressive Ghibli character proportions, highly detailed illustration, cinematic wide shot',
-    strength: 0.82,
+      'Studio Ghibli anime masterpiece illustration, person drawn in Hayao Miyazaki signature style, wearing a simple linen adventurer outfit with a travel satchel, standing at the entrance of a magical enchanted forest village with giant glowing spirit creatures and bioluminescent flowers, painterly watercolor textures, cinematic',
   },
   popstar: {
     prompt:
-      'hyperrealistic concert stage photography, person as a global pop music superstar performing on a massive arena stage, dramatic pyrotechnics exploding around them, blinding concert spotlights, fog machines, thousands of screaming fans in background, epic rock concert energy, 8K professional concert photography, Rolling Stone magazine cover quality',
-    strength: 0.84,
+      'hyperrealistic arena concert photography, person wearing a dazzling diamond-encrusted stage costume with flowing dramatic elements, center stage on a massive world tour arena with pyrotechnic explosions, confetti cannons, blinding spotlights, crowd of 80,000 fans, Rolling Stone magazine cover quality, 8K',
   },
 }
 
@@ -59,27 +52,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'image_base64 and filter are required' }, { status: 400 })
   }
 
-  const base = FILTER_BASE[filter]
-  if (!base) {
+  const config = FILTER_CONFIG[filter]
+  if (!config) {
     return NextResponse.json({ error: `Unknown filter: ${filter}` }, { status: 400 })
   }
 
-  // Inject brand/event context into the scene if operator provided one
   const prompt = brand_context?.trim()
-    ? `${base.prompt}, ${brand_context.trim()} branded event atmosphere, subtle brand presence integrated into the environment`
-    : base.prompt
+    ? `${config.prompt}, ${brand_context.trim()} branded event atmosphere integrated into the environment`
+    : config.prompt
 
   try {
     const imageBlob = base64ToBlob(image_base64, 'image/jpeg')
     const imageFile = new File([imageBlob], 'photo.jpg', { type: 'image/jpeg' })
     const imageUrl  = await fal.storage.upload(imageFile)
 
+    // PuLID: preserves the person's face exactly, generates new outfit + background
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = await fal.subscribe('fal-ai/flux/dev/image-to-image', {
+    const result = await fal.subscribe('fal-ai/flux-pulid', {
       input: {
-        image_url: imageUrl,
+        main_face_image: imageUrl,
         prompt,
-        strength: base.strength,
+        num_inference_steps: 20,
+        guidance_scale: 7,
+        num_images: 1,
       } as any,
       logs: false,
     }) as { data: { images: Array<{ url: string }> } }

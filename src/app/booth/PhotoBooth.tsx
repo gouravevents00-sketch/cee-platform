@@ -6,7 +6,7 @@ import NextImage from 'next/image'
 import { Camera, RefreshCw, Download, MessageCircle, Settings, Play, X, Sparkles } from 'lucide-react'
 
 type Stage = 'setup' | 'idle' | 'countdown' | 'captured' | 'processing' | 'result' | 'error'
-type FilterId = 'original' | 'neon' | 'royal' | 'magazine' | 'scifi' | 'warrior' | 'bollywood' | 'ghibli' | 'popstar'
+type FilterId = 'neon' | 'royal' | 'magazine' | 'scifi' | 'warrior' | 'bollywood' | 'ghibli' | 'popstar'
 type EventType = 'corporate' | 'wedding' | 'party' | 'brand'
 
 interface Filter {
@@ -19,7 +19,6 @@ interface Filter {
 }
 
 const FILTERS: Filter[] = [
-  { id: 'original',  label: 'Original',    emoji: '📸', description: 'Your real photo',         borderColor: 'border-gray-600',   gradientFrom: 'from-gray-700'    },
   { id: 'bollywood', label: 'Bollywood',   emoji: '🎬', description: 'Movie star energy',        borderColor: 'border-rose-500',   gradientFrom: 'from-rose-900'    },
   { id: 'neon',      label: 'Neon City',   emoji: '💜', description: 'Cyberpunk night scene',    borderColor: 'border-purple-500', gradientFrom: 'from-purple-900'  },
   { id: 'royal',     label: 'Royal',       emoji: '👑', description: 'Indian Maharaja palace',   borderColor: 'border-yellow-400', gradientFrom: 'from-yellow-900'  },
@@ -44,7 +43,7 @@ export default function PhotoBooth() {
   const [countdown, setCountdown]       = useState(COUNTDOWN_FROM)
   const [capturedUrl, setCapturedUrl]   = useState<string | null>(null)
   const [resultUrl, setResultUrl]       = useState<string | null>(null)
-  const [selectedFilter, setSelectedFilter] = useState<FilterId>('original')
+  const [selectedFilter, setSelectedFilter] = useState<FilterId>('bollywood')
   const [progress, setProgress]         = useState(0)
   const [genTime, setGenTime]           = useState(0)
   const [errorMsg, setErrorMsg]         = useState('')
@@ -121,7 +120,7 @@ export default function PhotoBooth() {
         const dataUrl = captureFrame()
         if (dataUrl) {
           setCapturedUrl(dataUrl)
-          setSelectedFilter('original')
+          setSelectedFilter('bollywood')
           setResultUrl(null)
           setLeadCaptured(false)
           setLeadName('')
@@ -141,11 +140,6 @@ export default function PhotoBooth() {
 
   const applyFilter = useCallback(async (filter: FilterId) => {
     if (!capturedUrl) return
-    if (filter === 'original') {
-      setResultUrl(capturedUrl)
-      setStage('result')
-      return
-    }
     setStage('processing')
     setProgress(0)
     setGenTime(0)
@@ -227,7 +221,7 @@ export default function PhotoBooth() {
     setErrorMsg('')
     setProgress(0)
     setGenTime(0)
-    setSelectedFilter('original')
+    setSelectedFilter('bollywood')
     setLeadCaptured(false)
     setLeadName('')
     setLeadPhone('')
@@ -529,13 +523,11 @@ export default function PhotoBooth() {
             ))}
           </div>
 
-          {selectedFilter !== 'original' && (
-            <p className="text-amber-500/70 text-xs text-center max-w-xs">
-              <Sparkles size={10} className="inline mr-1" />
-              {FILTERS.find(f => f.id === selectedFilter)?.description}
-              {brandTheme && ` · ${brandTheme} themed`}
-            </p>
-          )}
+          <p className="text-amber-500/70 text-xs text-center max-w-xs">
+            <Sparkles size={10} className="inline mr-1" />
+            {FILTERS.find(f => f.id === selectedFilter)?.description}
+            {brandTheme && ` · ${brandTheme} themed`}
+          </p>
 
           <div className="flex gap-3">
             <button
@@ -549,7 +541,7 @@ export default function PhotoBooth() {
               className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 active:scale-95 text-black font-bold px-8 py-3 rounded-xl transition-all shadow-lg shadow-amber-500/20"
             >
               <Sparkles size={16} />
-              {selectedFilter === 'original' ? 'Use Original' : `Apply ${filterLabel}`}
+              Apply {filterLabel}
             </button>
           </div>
         </div>
@@ -594,7 +586,7 @@ export default function PhotoBooth() {
 
           {/* Photos */}
           <div className="flex gap-4 items-end flex-shrink-0">
-            {selectedFilter !== 'original' && capturedUrl && (
+            {capturedUrl && (
               <>
                 <div className="flex flex-col items-center gap-1.5">
                   <p className="text-gray-600 text-xs uppercase tracking-wider">Before</p>
@@ -608,9 +600,9 @@ export default function PhotoBooth() {
             )}
             <div className="flex flex-col items-center gap-1.5">
               <p className="text-amber-400 text-xs uppercase tracking-wider font-medium">
-                {selectedFilter === 'original' ? 'Your Photo' : filterLabel}
+                {filterLabel}
               </p>
-              <div className={`${selectedFilter === 'original' ? 'w-64 h-64 sm:w-72 sm:h-72' : 'w-52 h-52 sm:w-60 sm:h-60'} rounded-2xl overflow-hidden border-2 border-amber-500/40 shadow-2xl shadow-amber-500/10 relative`}>
+              <div className="w-52 h-52 sm:w-60 sm:h-60 rounded-2xl overflow-hidden border-2 border-amber-500/40 shadow-2xl shadow-amber-500/10 relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={resultUrl}
