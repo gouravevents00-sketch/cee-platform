@@ -137,7 +137,7 @@ export default function Sidebar({ profile }: SidebarProps) {
       )}
 
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-56 bg-gray-950 border-r border-gray-900 flex-col h-screen fixed left-0 top-0">
+      <aside className="hidden md:flex w-56 bg-gray-950 border-r border-gray-900 flex-col h-screen fixed left-0 top-0 z-40">
         {sidebarContent}
       </aside>
     </>
