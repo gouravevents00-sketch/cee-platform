@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, CalendarDays, CheckSquare, Receipt, LogOut, Users, Building2, Truck, Menu, X, Share2, Sparkles, Bell, Star, Hammer, Package, Calendar, ListTodo, TrendingUp, BarChart2, Trophy, IndianRupee, FileText } from 'lucide-react'
+import { LayoutDashboard, CalendarDays, CheckSquare, Receipt, LogOut, Users, Building2, Truck, Menu, X, Share2, Sparkles, Bell, Star, Hammer, Package, Calendar, ListTodo, TrendingUp, BarChart2, Trophy, IndianRupee, FileText, Wallet } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Profile, ROLE_LABELS } from '@/lib/types'
 import NotificationBell from './NotificationBell'
@@ -42,6 +42,7 @@ export default function Sidebar({ profile }: SidebarProps) {
     { href: '/dashboard/inventory', label: 'Inventory', icon: Package, show: isDirector || isAdmin },
     { href: '/dashboard/sales', label: 'Sales', icon: TrendingUp, show: isDirector || isAdmin },
     { href: '/dashboard/quotations', label: 'Quotations', icon: FileText, show: isDirector || isAccounts || isAdmin },
+    { href: '/dashboard/finance', label: 'Finance', icon: Wallet, show: isDirector || isAccounts || isAdmin },
     { href: '/dashboard/rates', label: 'Rate Master', icon: IndianRupee, show: isDirector || isAccounts },
     { href: '/dashboard/leaderboard', label: 'CEEstar', icon: Trophy, show: true },
   ].filter(item => item.show)

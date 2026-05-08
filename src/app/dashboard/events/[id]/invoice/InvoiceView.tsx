@@ -44,6 +44,7 @@ interface Props {
   clientContact?: string
   clientPhone?: string
   clientEmail?: string
+  clientType?: string
   invoice: any
   payments: Payment[]
   receipts: Receipt[]
@@ -90,13 +91,14 @@ const MODE_LABELS: Record<string, string> = {
 // ══════════════════════════════════════════════════════════════════
 
 export default function InvoiceView({
-  eventId, eventName, clientName, clientContact, clientPhone, clientEmail,
+  eventId, eventName, clientName, clientContact, clientPhone, clientEmail, clientType,
   invoice, payments, receipts: initReceipts, isDirector, canEdit, company,
 }: Props) {
   const [items, setItems] = useState<InvoiceItem[]>(invoice?.items?.length ? invoice.items : [])
   const [invStatus, setInvStatus] = useState<string>(invoice?.status || 'draft')
   const [saving, setSaving] = useState(false)
   const [receipts, setReceipts] = useState<Receipt[]>(initReceipts)
+  const [reminderCopied, setReminderCopied] = useState(false)
 
   // Receipt modal state
   const [showReceiptModal, setShowReceiptModal] = useState(false)
@@ -178,6 +180,72 @@ export default function InvoiceView({
   const pendingPayments = payments.filter(p => p.status === 'pending')
   const inputCls = 'w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-500'
 
+  // ── Generate WhatsApp-ready payment reminder ───────────────────
+  function generateReminder(): string {
+    const name = clientContact || clientName || 'Sir/Madam'
+    const nextDue = pendingPayments.find(p => p.due_date)
+    const dueStr = nextDue?.due_date ? `\nDue Date: ${fmtDate(nextDue.due_date)}` : ''
+    const type = clientType || 'corporate'
+
+    if (type === 'agency') {
+      return `Hi ${name}! 👋
+Just a friendly reminder from *${company.name}* for *${eventName}*.
+
+🧾 Invoice: *${invoiceNumber}*
+💰 Total: ₹${fmt(grandTotal)}
+✅ Received: ₹${fmt(totalReceived)}
+⏳ *Balance Due: ₹${fmt(Math.max(0, balanceDue))}*${dueStr}
+
+Whenever convenient, please process the payment. Let us know if you need any details or a revised copy!
+
+Thanks & Regards,
+${company.name}
++91 86023 71023`
+    }
+
+    if (type === 'government') {
+      return `Respected Sir/Madam,
+
+*Subject: Payment Reminder — Invoice ${invoiceNumber} | ${eventName}*
+
+With due respect, we wish to draw your kind attention to the pending invoice amount against services rendered by our organisation for the above event.
+
+Invoice No: *${invoiceNumber}*
+Invoice Amount: ₹${fmt(grandTotal)}
+Amount Received: ₹${fmt(totalReceived)}
+*Balance Pending: ₹${fmt(Math.max(0, balanceDue))}*${dueStr}
+
+We humbly request your good office to kindly arrange for the release of the pending payment at the earliest convenience.
+
+Yours faithfully,
+${company.name}
+Indore, Madhya Pradesh
+📞 +91 86023 71023`
+    }
+
+    // default: corporate
+    return `Dear ${name},
+
+This is a gentle reminder regarding the pending invoice for *${eventName}*.
+
+Invoice No: *${invoiceNumber}*
+Invoice Amount: ₹${fmt(grandTotal)}
+Amount Received: ₹${fmt(totalReceived)}
+*Balance Due: ₹${fmt(Math.max(0, balanceDue))}*${dueStr}
+
+We request you to kindly arrange for the payment at your earliest convenience. Please feel free to reach out for any clarifications.
+
+Warm Regards,
+${company.name}
++91 86023 71023`
+  }
+
+  async function copyReminder() {
+    await navigator.clipboard.writeText(generateReminder())
+    setReminderCopied(true)
+    setTimeout(() => setReminderCopied(false), 2500)
+  }
+
   return (
     <div className="space-y-4">
 
@@ -219,6 +287,17 @@ export default function InvoiceView({
         )}
 
         <div className="ml-auto flex gap-2">
+          {balanceDue > 0 && invStatus !== 'paid' && (
+            <button onClick={copyReminder}
+              className={`flex items-center gap-1.5 text-sm px-4 py-2 rounded-xl transition-colors ${
+                reminderCopied
+                  ? 'bg-green-900/50 text-green-400'
+                  : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
+              }`}>
+              {reminderCopied ? <Check size={13} /> : <MessageCircle size={13} />}
+              {reminderCopied ? 'Copied!' : 'Copy Reminder'}
+            </button>
+          )}
           <button onClick={() => window.print()}
             className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-black font-semibold text-sm px-4 py-2 rounded-xl transition-colors">
             <Printer size={13} /> Print Invoice

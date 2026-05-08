@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await fal.subscribe('fal-ai/flux-pulid', {
       input: {
-        main_face_image: imageUrl,
+        reference_image_url: imageUrl,
         prompt,
         num_inference_steps: 20,
         guidance_scale: 7,

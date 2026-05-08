@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep *)",
+      "Bash(npx tsc --noEmit *)",
+      "Bash(npm list *)",
+      "Bash(npm run build *)",
+      "Bash(vercel ls *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" *)"
+    ]
+  }
+}

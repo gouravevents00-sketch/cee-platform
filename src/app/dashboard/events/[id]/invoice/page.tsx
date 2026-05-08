@@ -32,7 +32,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   const { data: event } = await supabase
     .from('events')
-    .select('id, name, clients(name, contact_name, contact_phone, contact_email)')
+    .select('id, name, clients(name, contact_name, contact_phone, contact_email, client_type)')
     .eq('id', id)
     .single()
 
@@ -81,6 +81,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           clientContact={client?.contact_name}
           clientPhone={client?.contact_phone}
           clientEmail={client?.contact_email}
+          clientType={client?.client_type}
           invoice={invoice}
           payments={payments || []}
           receipts={(receipts || []) as any[]}

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 
 export async function POST(req: NextRequest) {
-  const { name, phone, event_name, filter_used, result_url } = await req.json()
+  const { name, phone, event_name, filter_used, result_url, rating } = await req.json()
 
   if (!name || !phone) {
     return NextResponse.json({ error: 'name and phone are required' }, { status: 400 })
@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
       event_name: event_name || null,
       filter_used: filter_used || null,
       result_url: result_url || null,
+      rating: rating || null,
     })
 
     if (error) throw error
