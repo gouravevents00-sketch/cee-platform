@@ -87,7 +87,7 @@ export default function NotificationBell({ userId, openUpward }: { userId: strin
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className={`absolute right-0 w-80 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl z-20 overflow-hidden ${openUpward ? 'bottom-full mb-2' : 'top-full mt-2'}`}>
+          <div className={`absolute w-80 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl z-50 overflow-hidden ${openUpward ? 'bottom-full mb-2 left-0' : 'top-full mt-2 right-0'}`}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
               <span className="text-white font-semibold text-sm">Notifications</span>
               {unread > 0 && (
