@@ -1,7 +1,18 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
+  const path = request.nextUrl.pathname
+
+  const isPublicPage =
+    path === '/' ||
+    path === '/brief' ||
+    path.startsWith('/brief/') ||
+    path.startsWith('/quote/') ||
+    path.startsWith('/portal/')
+
+  if (isPublicPage) return NextResponse.next()
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -23,16 +34,9 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const path = request.nextUrl.pathname
   const isAuthPage = path.startsWith('/login')
-  const isPublicPage =
-    path === '/' ||
-    path === '/brief' ||
-    path.startsWith('/brief/') ||
-    path.startsWith('/quote/') ||
-    path.startsWith('/portal/')
 
-  if (!user && !isAuthPage && !isPublicPage) {
+  if (!user && !isAuthPage) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
