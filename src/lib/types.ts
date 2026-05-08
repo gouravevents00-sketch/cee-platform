@@ -109,7 +109,18 @@ export const STATUS_COLORS = {
 
 // ─── Experiences ────────────────────────────────────────────────────────────
 
-export type ServiceType = 'laser' | 'sketch' | 'robo_arm' | '3d_print'
+export type ServiceType =
+  | 'laser'
+  | 'sketch'
+  | 'robo_arm'
+  | '3d_print'
+  | 'photo_booth'
+  | 'photo_360'
+  | 'glambot'
+  | 'mirror_booth'
+  | 'brand_activation'
+  | 'roaming_selfie'
+  | 'mosaic_wall'
 export type OrderStatus = 'inquiry' | 'confirmed' | 'assigned' | 'completed' | 'cancelled'
 
 export interface ServicePackage {
@@ -198,6 +209,90 @@ export const EXPERIENCE_SERVICES: ExperienceService[] = [
     ],
     extra_piece_rate: null,
   },
+  {
+    id: 'photo_booth',
+    name: 'AI Photo Booth',
+    description: 'AI-powered photo booth — filters, face swap, WhatsApp & QR sharing, branded prints',
+    color: 'bg-pink-100 text-pink-700',
+    packages: [
+      { name: 'Basic', duration: '3 hrs', pieces: null, price: 15000 },
+      { name: 'Standard', duration: '6 hrs', pieces: null, price: 25000 },
+      { name: 'Premium', duration: 'Full day', pieces: null, price: 40000 },
+    ],
+    extra_piece_rate: null,
+  },
+  {
+    id: 'photo_360',
+    name: '360° Video Booth',
+    description: 'Cinematic 360° slow-motion video — viral content for guests at weddings & corporate events',
+    color: 'bg-violet-100 text-violet-700',
+    packages: [
+      { name: 'Standard', duration: '4 hrs', pieces: null, price: 25000 },
+      { name: 'Premium', duration: '8 hrs', pieces: null, price: 45000 },
+      { name: 'Luxury', duration: 'Full day', pieces: null, price: 65000 },
+    ],
+    extra_piece_rate: null,
+  },
+  {
+    id: 'glambot',
+    name: 'GlamBot Slow-Mo',
+    description: 'Red-carpet cinematic slow-motion arm — high-end weddings, film promos, brand launches',
+    color: 'bg-yellow-100 text-yellow-700',
+    packages: [
+      { name: 'Standard', duration: '4 hrs', pieces: null, price: 40000 },
+      { name: 'Premium', duration: '8 hrs', pieces: null, price: 65000 },
+      { name: 'Luxury', duration: 'Full day', pieces: null, price: 85000 },
+    ],
+    extra_piece_rate: null,
+  },
+  {
+    id: 'mirror_booth',
+    name: 'Mirror Booth',
+    description: 'Full-length interactive magic mirror with animations, touch prompts & printed photos',
+    color: 'bg-cyan-100 text-cyan-700',
+    packages: [
+      { name: 'Basic', duration: '3 hrs', pieces: null, price: 20000 },
+      { name: 'Standard', duration: '6 hrs', pieces: null, price: 35000 },
+      { name: 'Premium', duration: 'Full day', pieces: null, price: 50000 },
+    ],
+    extra_piece_rate: null,
+  },
+  {
+    id: 'brand_activation',
+    name: 'Brand Activation Station',
+    description: 'Custom branded AI photo experience — AI inserts brand product into guest photos for viral reach',
+    color: 'bg-red-100 text-red-700',
+    packages: [
+      { name: 'Half Day', duration: '4 hrs', pieces: null, price: 35000 },
+      { name: 'Full Day', duration: '8 hrs', pieces: null, price: 60000 },
+      { name: 'Campaign', duration: 'Multi-day', pieces: null, price: 100000 },
+    ],
+    extra_piece_rate: null,
+  },
+  {
+    id: 'roaming_selfie',
+    name: 'Roaming Selfie Stand',
+    description: 'Operator-held tablet selfie stand roaming the event — no fixed booth, maximum guest coverage',
+    color: 'bg-teal-100 text-teal-700',
+    packages: [
+      { name: 'Basic', duration: '3 hrs', pieces: null, price: 8000 },
+      { name: 'Standard', duration: '6 hrs', pieces: null, price: 14000 },
+      { name: 'Premium', duration: 'Full day', pieces: null, price: 22000 },
+    ],
+    extra_piece_rate: null,
+  },
+  {
+    id: 'mosaic_wall',
+    name: 'Photo Mosaic Wall',
+    description: 'Guest photos come together live into one giant mosaic artwork — stunning focal point for any event',
+    color: 'bg-indigo-100 text-indigo-700',
+    packages: [
+      { name: 'Standard', duration: '4 hrs', pieces: null, price: 15000 },
+      { name: 'Premium', duration: '8 hrs', pieces: null, price: 25000 },
+      { name: 'Full Day', duration: 'Full day', pieces: null, price: 35000 },
+    ],
+    extra_piece_rate: null,
+  },
 ]
 
 export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
@@ -213,6 +308,13 @@ export const SERVICE_LABELS: Record<ServiceType, string> = {
   sketch: 'Sketch Portrait',
   robo_arm: 'Robo Arm Demo',
   '3d_print': '3D Printing',
+  photo_booth: 'AI Photo Booth',
+  photo_360: '360° Video Booth',
+  glambot: 'GlamBot Slow-Mo',
+  mirror_booth: 'Mirror Booth',
+  brand_activation: 'Brand Activation',
+  roaming_selfie: 'Roaming Selfie Stand',
+  mosaic_wall: 'Photo Mosaic Wall',
 }
 
 // ─── Production House ────────────────────────────────────────────────────────

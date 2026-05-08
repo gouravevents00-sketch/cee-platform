@@ -1,7 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, ClipboardList, Zap, PenLine, Bot, Layers } from 'lucide-react'
+import {
+  Plus, ClipboardList, Zap, PenLine, Bot, Layers,
+  Camera, RotateCw, Sparkles, Maximize2, Megaphone, Smartphone, LayoutGrid,
+} from 'lucide-react'
 import { EXPERIENCE_SERVICES, ServiceType } from '@/lib/types'
 
 const SERVICE_ICONS: Record<ServiceType, React.ElementType> = {
@@ -9,6 +12,13 @@ const SERVICE_ICONS: Record<ServiceType, React.ElementType> = {
   sketch: PenLine,
   robo_arm: Bot,
   '3d_print': Layers,
+  photo_booth: Camera,
+  photo_360: RotateCw,
+  glambot: Sparkles,
+  mirror_booth: Maximize2,
+  brand_activation: Megaphone,
+  roaming_selfie: Smartphone,
+  mosaic_wall: LayoutGrid,
 }
 
 export default async function ExperiencesPage() {
@@ -34,6 +44,13 @@ export default async function ExperiencesPage() {
           <p className="text-gray-500 text-sm mt-0.5">Creative Era Experiences — event tech services</p>
         </div>
         <div className="flex items-center gap-3">
+          <Link
+            href="/dashboard/experiences/booth"
+            className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium px-4 py-2.5 rounded-xl text-sm transition-colors"
+          >
+            <Camera size={16} />
+            Photo Booth
+          </Link>
           <Link
             href="/dashboard/experiences/orders"
             className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium px-4 py-2.5 rounded-xl text-sm transition-colors"

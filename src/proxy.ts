@@ -9,7 +9,10 @@ export async function proxy(request: NextRequest) {
     path === '/brief' ||
     path.startsWith('/brief/') ||
     path.startsWith('/quote/') ||
-    path.startsWith('/portal/')
+    path.startsWith('/portal/') ||
+    path === '/booth' ||
+    path.startsWith('/booth/') ||
+    path.startsWith('/api/booth/')
 
   if (isPublicPage) return NextResponse.next()
 

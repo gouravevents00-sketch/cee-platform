@@ -3,13 +3,23 @@
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { EXPERIENCE_SERVICES, ServiceType } from '@/lib/types'
-import { Zap, PenLine, Bot, Layers, Plus, X, ShoppingCart } from 'lucide-react'
+import {
+  Zap, PenLine, Bot, Layers, Plus, X, ShoppingCart,
+  Camera, RotateCw, Sparkles, Maximize2, Megaphone, Smartphone, LayoutGrid,
+} from 'lucide-react'
 
 const SERVICE_ICONS: Record<ServiceType, React.ElementType> = {
   laser: Zap,
   sketch: PenLine,
   robo_arm: Bot,
   '3d_print': Layers,
+  photo_booth: Camera,
+  photo_360: RotateCw,
+  glambot: Sparkles,
+  mirror_booth: Maximize2,
+  brand_activation: Megaphone,
+  roaming_selfie: Smartphone,
+  mosaic_wall: LayoutGrid,
 }
 
 interface CartItem {
