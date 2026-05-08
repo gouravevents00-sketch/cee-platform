@@ -4,7 +4,7 @@ import { useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
-  Plus, Trash2, Printer, Save, Send, Download, Upload, ListPlus,
+  Plus, Trash2, Printer, Save, Send, Upload, ListPlus,
   Lock, Wand2, ChevronDown, ChevronUp, Eye, EyeOff, CheckCircle2, Copy, Check,
 } from 'lucide-react'
 
@@ -151,10 +151,6 @@ function rowVendorCost(r: QuoteRow): number {
   return (r.days || 1) * (r.qty || 1) * multiplier * (r.vendor_rate || 0)
 }
 
-function rowMargin(r: QuoteRow): number {
-  return rowAmount(r) - rowVendorCost(r)
-}
-
 function fmt(n: number): string {
   return Math.round(n).toLocaleString('en-IN')
 }
@@ -216,7 +212,7 @@ export default function QuotationBuilder({
   )
   const [discountPct, setDiscountPct] = useState<number>(existing?.discount_pct || 0)
   const [showDiscount, setShowDiscount] = useState(discountPct > 0)
-  const [validity, setValidity] = useState(existing?.validity_days ?? 7)
+  const [validity] = useState(existing?.validity_days ?? 7)
   const [notes, setNotes] = useState(
     existing?.notes ?? '1. 50% advance at booking confirmation. Balance before event.\n2. Cancellation within 7 days — 50% charges apply.\n3. Additional items will be billed separately.\n4. GST as applicable. All disputes subject to Indore jurisdiction.'
   )
@@ -595,10 +591,9 @@ export default function QuotationBuilder({
   return (
     <div className="space-y-4">
 
-      {/* ── TOP ACTION BAR ──────────────────────────────────────── */}
+      {/* ── ROW 1: STATUS + SEND ACTIONS ─────────────────────────── */}
       <div className="flex items-center gap-2 flex-wrap print:hidden">
-
-        {/* Company switch */}
+        {/* Company */}
         <select value={company} onChange={e => setCompany(e.target.value as Company)}
           disabled={isLocked || !canEdit}
           className="bg-gray-900 border border-gray-700 text-gray-300 text-xs rounded-xl px-3 py-2 focus:outline-none disabled:opacity-50">
@@ -614,107 +609,46 @@ export default function QuotationBuilder({
           status === 'accepted' ? 'bg-green-900/50 text-green-400' :
           'bg-red-900/50 text-red-400'
         }`}>
-          {lockDone ? '🔒 LOCKED' : status.toUpperCase()}
+          {lockDone ? '🔒 Locked' : status.charAt(0).toUpperCase() + status.slice(1)}
         </span>
 
-        {/* Save */}
-        {canEdit && !lockDone && (
-          <button onClick={() => save()} disabled={saving}
-            className="flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm px-4 py-2 rounded-xl transition-colors disabled:opacity-50">
-            <Save size={13} /> {saving ? 'Saving...' : 'Save'}
-          </button>
-        )}
-
-        {/* Status transitions */}
-        {canEdit && !lockDone && status === 'draft' && (
-          <button onClick={() => save('sent')} disabled={saving}
-            className="flex items-center gap-1.5 bg-blue-950 hover:bg-blue-900 text-blue-400 text-sm px-4 py-2 rounded-xl transition-colors">
-            <Send size={13} /> Mark Sent
-          </button>
-        )}
-        {canEdit && !lockDone && status === 'sent' && (
-          <>
-            <button onClick={() => save('accepted')} disabled={saving}
-              className="bg-green-950 hover:bg-green-900 text-green-400 text-sm px-4 py-2 rounded-xl transition-colors">Accepted</button>
-            <button onClick={() => save('rejected')} disabled={saving}
-              className="bg-red-950 hover:bg-red-900 text-red-400 text-sm px-4 py-2 rounded-xl transition-colors">Rejected</button>
-          </>
-        )}
-
-        {/* LOCK button — director only */}
-        {isDirector && !lockDone && quoteId && (
-          <button onClick={handleLock} disabled={locking}
-            className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm px-5 py-2 rounded-xl transition-colors disabled:opacity-50">
-            <Lock size={13} /> {locking ? 'Locking...' : 'LOCK & ACTIVATE'}
-          </button>
-        )}
         {lockDone && (
-          <span className="flex items-center gap-1.5 text-green-400 text-sm">
-            <CheckCircle2 size={14} /> Quotation locked — elements &amp; tasks generated
+          <span className="flex items-center gap-1.5 text-green-400 text-xs">
+            <CheckCircle2 size={13} /> Elements &amp; tasks generated
           </span>
         )}
 
-        {/* Right side tools */}
+        {/* Right: send/finalize actions */}
         <div className="flex items-center gap-2 ml-auto">
-          {/* AI Parse Brief */}
           {canEdit && !lockDone && (
-            <button onClick={() => setShowAI(v => !v)}
-              className="flex items-center gap-1.5 bg-purple-950 hover:bg-purple-900 text-purple-400 text-sm px-4 py-2 rounded-xl transition-colors">
-              <Wand2 size={13} /> AI Parse
+            <button onClick={() => save()} disabled={saving}
+              className="flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm px-4 py-2 rounded-xl transition-colors disabled:opacity-50">
+              <Save size={13} /> {saving ? 'Saving…' : 'Save'}
             </button>
           )}
 
-          {/* AI Fill Rates */}
-          {isDirector && !lockDone && rows.some(r => r._type === 'item' && r.description?.trim() && !r.is_lumpsum) && (
-            <button
-              onClick={handleFillRates}
-              disabled={ratesFilling}
-              className="flex items-center gap-1.5 bg-green-950 hover:bg-green-900 text-green-400 text-sm px-4 py-2 rounded-xl transition-colors disabled:opacity-50"
-              title="AI suggests rates from historical quotations"
-            >
-              <Wand2 size={13} /> {ratesFilling ? 'Filling…' : 'AI Fill Rates'}
+          {canEdit && !lockDone && status === 'draft' && (
+            <button onClick={() => save('sent')} disabled={saving}
+              className="flex items-center gap-1.5 bg-blue-950 hover:bg-blue-900 text-blue-400 text-sm px-4 py-2 rounded-xl transition-colors">
+              <Send size={13} /> Mark Sent
             </button>
           )}
-
-          {/* Import elements */}
-          {canEdit && !lockDone && eventElements.length > 0 && (
-            <button onClick={importFromElements}
-              className="flex items-center gap-1.5 bg-amber-950 hover:bg-amber-900 text-amber-400 text-sm px-4 py-2 rounded-xl transition-colors">
-              <ListPlus size={13} /> Import
-            </button>
+          {canEdit && !lockDone && status === 'sent' && (
+            <>
+              <button onClick={() => save('accepted')} disabled={saving}
+                className="bg-green-950 hover:bg-green-900 text-green-400 text-sm px-4 py-2 rounded-xl transition-colors">Accepted</button>
+              <button onClick={() => save('rejected')} disabled={saving}
+                className="bg-red-950 hover:bg-red-900 text-red-400 text-sm px-4 py-2 rounded-xl transition-colors">Rejected</button>
+            </>
           )}
 
-          {/* Vendor col toggle — internal only */}
-          {isDirector && (
-            <button onClick={() => setShowVendorCol(v => !v)}
-              className="flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 text-sm px-3 py-2 rounded-xl transition-colors"
-              title="Toggle vendor column">
-              {showVendorCol ? <EyeOff size={13} /> : <Eye size={13} />} Vendor
-            </button>
-          )}
-
-          <button onClick={exportJSON}
-            className="flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm px-3 py-2 rounded-xl transition-colors">
-            <Download size={13} /> JSON
-          </button>
-
-          {canEdit && (
-            <button onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm px-3 py-2 rounded-xl transition-colors">
-              <Upload size={13} /> Load
-            </button>
-          )}
-          <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
-
-          {/* Share with client */}
+          {/* Share link */}
           {isDirector && quoteId && (
             shareLink ? (
               <div className="flex items-center gap-1.5">
-                <input
-                  readOnly value={shareLink}
-                  className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-gray-300 text-xs w-48 focus:outline-none"
-                  onFocus={e => e.target.select()}
-                />
+                <input readOnly value={shareLink}
+                  className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-gray-300 text-xs w-44 focus:outline-none"
+                  onFocus={e => e.target.select()} />
                 <button onClick={copyShareLink}
                   className="flex items-center gap-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs px-3 py-2 rounded-xl transition-colors flex-shrink-0">
                   {shareCopied ? <><Check size={11} className="text-green-400" /> Copied</> : <><Copy size={11} /> Copy</>}
@@ -722,25 +656,92 @@ export default function QuotationBuilder({
               </div>
             ) : (
               <button onClick={handleShare} disabled={sharing}
-                className="flex items-center gap-1.5 bg-blue-950 hover:bg-blue-900 text-blue-400 text-sm px-4 py-2 rounded-xl transition-colors disabled:opacity-50">
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm px-4 py-2 rounded-xl transition-colors disabled:opacity-50 font-medium">
                 <Send size={13} /> {sharing ? 'Generating…' : 'Share with Client'}
               </button>
             )
           )}
 
-          {/* Print buttons */}
+          {isDirector && !lockDone && quoteId && (
+            <button onClick={handleLock} disabled={locking}
+              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm px-5 py-2 rounded-xl transition-colors disabled:opacity-50">
+              <Lock size={13} /> {locking ? 'Locking…' : 'Lock & Activate'}
+            </button>
+          )}
+
           <button onClick={() => handlePrint('client')}
-            className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-black font-semibold text-sm px-4 py-2 rounded-xl transition-colors">
-            <Printer size={13} /> Client PDF
+            className="flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm px-3 py-2 rounded-xl transition-colors">
+            <Printer size={13} /> PDF
           </button>
           {isDirector && (
             <button onClick={() => handlePrint('internal')}
-              className="flex items-center gap-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm px-4 py-2 rounded-xl transition-colors">
-              <Printer size={13} /> Internal
+              className="flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs px-3 py-2 rounded-xl transition-colors">
+              Internal
             </button>
           )}
         </div>
       </div>
+
+      {/* ── ROW 2: BUILD TOOLS (only when editing) ───────────────── */}
+      {canEdit && !lockDone && (
+        <div className="flex items-center gap-2 flex-wrap print:hidden">
+          {/* AI tools — prominent */}
+          <button onClick={() => setShowAI(v => !v)}
+            className={`flex items-center gap-2 text-sm px-4 py-2 rounded-xl border transition-colors font-medium ${
+              showAI
+                ? 'bg-purple-600 border-purple-500 text-white'
+                : 'bg-purple-950/50 border-purple-800/50 text-purple-400 hover:bg-purple-950 hover:border-purple-700'
+            }`}>
+            <Wand2 size={14} /> AI: Parse Brief / Upload Sheet
+          </button>
+
+          {rows.some(r => r._type === 'item' && r.description?.trim() && !r.is_lumpsum) && isDirector && (
+            <button onClick={handleFillRates} disabled={ratesFilling}
+              className="flex items-center gap-2 text-sm px-4 py-2 rounded-xl border bg-green-950/50 border-green-800/50 text-green-400 hover:bg-green-950 hover:border-green-700 transition-colors font-medium disabled:opacity-50">
+              <Wand2 size={14} /> {ratesFilling ? 'Filling rates…' : 'AI: Fill Rates'}
+            </button>
+          )}
+
+          {eventElements.length > 0 && (
+            <button onClick={importFromElements}
+              className="flex items-center gap-2 text-sm px-4 py-2 rounded-xl border bg-amber-950/30 border-amber-800/40 text-amber-400 hover:bg-amber-950/60 transition-colors font-medium">
+              <ListPlus size={14} /> Import Elements
+            </button>
+          )}
+
+          {/* Divider */}
+          <div className="h-6 w-px bg-gray-700 mx-1" />
+
+          {/* Table controls */}
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+              <input type="checkbox" checked={showDiscount} onChange={e => setShowDiscount(e.target.checked)} disabled={lockDone} />
+              Discount
+            </label>
+            <select value={gstMode} onChange={e => setGstMode(e.target.value as GSTMode)} disabled={lockDone}
+              className="bg-gray-900 border border-gray-700 text-gray-400 text-xs rounded-lg px-2 py-1.5 focus:outline-none disabled:opacity-50">
+              <option value="none">No GST</option>
+              <option value="exclusive">+18% GST</option>
+              <option value="inclusive">18% included</option>
+            </select>
+            {isDirector && (
+              <button onClick={() => setShowVendorCol(v => !v)}
+                className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
+                  showVendorCol ? 'border-amber-700 text-amber-400 bg-amber-950/30' : 'border-gray-700 text-gray-500 hover:border-gray-600'
+                }`}>
+                {showVendorCol ? <Eye size={11} /> : <EyeOff size={11} />} Vendor
+              </button>
+            )}
+          </div>
+
+          {/* JSON backup */}
+          <div className="ml-auto flex items-center gap-1.5">
+            <button onClick={exportJSON} className="text-xs text-gray-600 hover:text-gray-400 transition-colors px-2 py-1 rounded-lg hover:bg-gray-800">Export JSON</button>
+            <button onClick={() => fileInputRef.current?.click()} className="text-xs text-gray-600 hover:text-gray-400 transition-colors px-2 py-1 rounded-lg hover:bg-gray-800">Load JSON</button>
+          </div>
+          <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
+        </div>
+      )}
 
       {/* ── AI RATE FILL FEEDBACK ───────────────────────────────── */}
       {ratesFillNote && (
@@ -751,165 +752,44 @@ export default function QuotationBuilder({
 
       {/* ── AI BRIEF PARSER ─────────────────────────────────────── */}
       {showAI && (
-        <div className="bg-gray-900 border border-purple-900 rounded-2xl p-4 print:hidden">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-purple-400 font-semibold text-sm flex items-center gap-2">
-              <Wand2 size={14} /> AI Brief Parser
+        <div className="bg-gray-900 border border-purple-800/60 rounded-2xl p-5 print:hidden">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-purple-300 font-semibold flex items-center gap-2">
+              <Wand2 size={15} /> AI Brief Parser
             </p>
-            <button onClick={() => setShowAI(false)} className="text-gray-500 hover:text-white text-xs">✕ Close</button>
+            <button onClick={() => setShowAI(false)} className="text-gray-500 hover:text-white text-xs px-2 py-1 rounded-lg hover:bg-gray-800 transition-colors">✕ Close</button>
           </div>
 
-          {/* File upload option */}
-          <div className="mb-3 p-3 bg-gray-800/60 border border-gray-700 rounded-xl flex items-center justify-between gap-3">
-            <div>
-              <p className="text-gray-300 text-sm font-medium">Upload Element Sheet</p>
-              <p className="text-gray-500 text-xs mt-0.5">.xlsx, .xls, .csv, .docx supported</p>
-            </div>
-            <button
-              onClick={() => aiFileRef.current?.click()}
-              disabled={aiLoading}
-              className="flex items-center gap-1.5 bg-purple-700 hover:bg-purple-600 text-white text-sm px-4 py-2 rounded-xl transition-colors disabled:opacity-50 flex-shrink-0"
-            >
-              <Upload size={13} /> {aiLoading ? 'Parsing...' : 'Upload File'}
-            </button>
-            <input
-              ref={aiFileRef}
-              type="file"
-              accept=".xlsx,.xls,.csv,.docx,.doc,.txt"
-              onChange={handleAIFileUpload}
-              className="hidden"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 mb-2">
-            <div className="flex-1 h-px bg-gray-700" />
-            <span className="text-gray-600 text-xs">or paste text</span>
-            <div className="flex-1 h-px bg-gray-700" />
-          </div>
-
-          <textarea
-            value={aiBrief}
-            onChange={e => setAiBrief(e.target.value)}
-            rows={5}
-            placeholder="Paste the client brief, RFQ, tender document, or WhatsApp requirements here..."
-            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-gray-300 text-sm focus:outline-none focus:border-purple-500 resize-none"
-          />
-          <div className="flex items-center justify-between mt-2">
-            <p className="text-gray-500 text-xs">AI will extract all items and suggest rows. You review and edit before saving.</p>
-            <button onClick={handleParseBrief} disabled={aiLoading || !aiBrief.trim()}
-              className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-500 text-white text-sm px-5 py-2 rounded-xl transition-colors disabled:opacity-50">
-              <Wand2 size={13} /> {aiLoading ? 'Parsing...' : 'Parse & Add Rows'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── PAYMENT MILESTONES PANEL ────────────────────────────── */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden print:hidden">
-        <button
-          onClick={() => setShowMilestones(v => !v)}
-          className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-800 transition-colors">
-          <span className="text-amber-400 font-semibold text-sm">
-            Payment Schedule
-            {milestonesTotal !== 100 && (
-              <span className="ml-2 text-red-400 text-xs font-normal">
-                ({milestonesTotal}% — should be 100%)
-              </span>
-            )}
-            {milestonesTotal === 100 && grandTotal > 0 && (
-              <span className="ml-2 text-gray-500 text-xs font-normal">
-                (3 milestones · total ₹{fmt(grandTotal)})
-              </span>
-            )}
-          </span>
-          {showMilestones ? <ChevronUp size={14} className="text-gray-500" /> : <ChevronDown size={14} className="text-gray-500" />}
-        </button>
-        {showMilestones && (
-          <div className="px-5 pb-4 space-y-2">
-            {milestones.map((m, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <input
-                  value={m.label}
-                  onChange={e => updateMilestone(i, { label: e.target.value })}
-                  disabled={!canEdit || lockDone}
-                  placeholder="Milestone label"
-                  className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50"
-                />
-                <div className="flex items-center gap-1 w-20">
-                  <input
-                    type="number" value={m.percent} min="0" max="100"
-                    onChange={e => updateMilestone(i, { percent: Number(e.target.value) })}
-                    disabled={!canEdit || lockDone}
-                    className="w-14 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-center text-amber-400 text-sm focus:outline-none disabled:opacity-50"
-                  />
-                  <span className="text-gray-500 text-xs">%</span>
-                </div>
-                {grandTotal > 0 && (
-                  <span className="text-gray-400 text-xs w-28 text-right">
-                    ₹ {fmt(grandTotal * m.percent / 100)}
-                  </span>
-                )}
-                <input
-                  type="date" value={m.due_date}
-                  onChange={e => updateMilestone(i, { due_date: e.target.value })}
-                  disabled={!canEdit || lockDone}
-                  className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-gray-400 text-xs focus:outline-none disabled:opacity-50"
-                />
-                {canEdit && !lockDone && (
-                  <button onClick={() => removeMilestone(i)} className="text-gray-600 hover:text-red-400 transition-colors">
-                    <Trash2 size={12} />
-                  </button>
-                )}
-              </div>
-            ))}
-            {canEdit && !lockDone && (
-              <button onClick={addMilestone}
-                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-amber-400 transition-colors mt-1">
-                <Plus size={11} /> Add milestone
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="p-4 bg-gray-800/60 border border-gray-700 rounded-xl">
+              <p className="text-gray-200 text-sm font-semibold mb-1">Upload Element Sheet</p>
+              <p className="text-gray-500 text-xs mb-3">.xlsx, .xls, .csv, .docx — AI reads and extracts all rows</p>
+              <button onClick={() => aiFileRef.current?.click()} disabled={aiLoading}
+                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white text-sm px-4 py-2 rounded-xl transition-colors disabled:opacity-50 font-medium w-full justify-center">
+                <Upload size={13} /> {aiLoading ? 'Parsing…' : 'Upload File'}
               </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ── COMPLIANCE PANEL ────────────────────────────────────── */}
-      {isDirector && (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden print:hidden">
-          <button
-            onClick={() => setShowCompliance(v => !v)}
-            className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-800 transition-colors">
-            <span className="text-gray-400 font-semibold text-sm">Compliance Details (GST · PAN · Bank · TDS)</span>
-            {showCompliance ? <ChevronUp size={14} className="text-gray-500" /> : <ChevronDown size={14} className="text-gray-500" />}
-          </button>
-          {showCompliance && (
-            <div className="px-5 pb-4 grid grid-cols-2 gap-3">
-              {([
-                ['gst_no', 'GST Number'],
-                ['pan', 'PAN'],
-                ['msme', 'MSME/Udyam'],
-                ['bank_name', 'Bank Name'],
-                ['account_no', 'Account No.'],
-                ['ifsc', 'IFSC Code'],
-                ['tds', 'TDS Clause'],
-              ] as [keyof Compliance, string][]).map(([key, label]) => (
-                <div key={key}>
-                  <label className="text-gray-500 text-xs mb-1 block">{label}</label>
-                  <input
-                    value={compliance[key]}
-                    onChange={e => setCompliance(prev => ({ ...prev, [key]: e.target.value }))}
-                    disabled={lockDone}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50"
-                  />
-                </div>
-              ))}
+              <input ref={aiFileRef} type="file" accept=".xlsx,.xls,.csv,.docx,.doc,.txt" onChange={handleAIFileUpload} className="hidden" />
             </div>
-          )}
+            <div className="p-4 bg-gray-800/60 border border-gray-700 rounded-xl">
+              <p className="text-gray-200 text-sm font-semibold mb-1">Paste Brief Text</p>
+              <p className="text-gray-500 text-xs mb-3">RFQ, WhatsApp requirements, tender document</p>
+              <textarea value={aiBrief} onChange={e => setAiBrief(e.target.value)} rows={3}
+                placeholder="Paste client requirements here…"
+                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-gray-300 text-xs focus:outline-none focus:border-purple-500 resize-none mb-2" />
+              <button onClick={handleParseBrief} disabled={aiLoading || !aiBrief.trim()}
+                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white text-sm px-4 py-2 rounded-xl transition-colors disabled:opacity-50 font-medium w-full justify-center">
+                <Wand2 size={13} /> {aiLoading ? 'Parsing…' : 'Parse & Add Rows'}
+              </button>
+            </div>
+          </div>
+          <p className="text-gray-600 text-xs">AI extracts items, specs, dimensions and adds them as rows. Review and edit everything before saving.</p>
         </div>
       )}
 
       {/* ══════════════════════════════════════════════════════════
           QUOTATION DOCUMENT
       ══════════════════════════════════════════════════════════ */}
+
       <div
         className="rounded-2xl overflow-hidden shadow-2xl print:shadow-none print:rounded-none"
         id="quotation-doc"
@@ -1018,7 +898,6 @@ export default function QuotationBuilder({
               const amt = rowAmount(row)
               const vCost = rowVendorCost(row)
               const margin = amt - vCost
-              const vendorName = vendors.find(v => v.id === row.vendor_id)?.name || ''
 
               return (
                 <tr key={i} className="border-b group hover:bg-amber-50 transition-colors"
@@ -1313,6 +1192,79 @@ export default function QuotationBuilder({
           <p className="text-xs" style={{ color: '#888' }}>#{qNum}</p>
         </div>
       </div>
+
+      {/* ── PAYMENT MILESTONES ──────────────────────────────────── */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden print:hidden">
+        <button onClick={() => setShowMilestones(v => !v)}
+          className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-800/50 transition-colors">
+          <span className="text-amber-400 font-semibold text-sm flex items-center gap-2">
+            Payment Schedule
+            {milestonesTotal !== 100 && <span className="text-red-400 text-xs font-normal">({milestonesTotal}% — must be 100%)</span>}
+            {milestonesTotal === 100 && grandTotal > 0 && <span className="text-gray-500 text-xs font-normal">· ₹{fmt(grandTotal)} in {milestones.length} milestones</span>}
+          </span>
+          {showMilestones ? <ChevronUp size={14} className="text-gray-500" /> : <ChevronDown size={14} className="text-gray-500" />}
+        </button>
+        {showMilestones && (
+          <div className="px-5 pb-4 space-y-2">
+            {milestones.map((m, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <input value={m.label} onChange={e => updateMilestone(i, { label: e.target.value })}
+                  disabled={!canEdit || lockDone} placeholder="Milestone label"
+                  className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50" />
+                <div className="flex items-center gap-1 w-20">
+                  <input type="number" value={m.percent} min="0" max="100"
+                    onChange={e => updateMilestone(i, { percent: Number(e.target.value) })}
+                    disabled={!canEdit || lockDone}
+                    className="w-14 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-center text-amber-400 text-sm focus:outline-none disabled:opacity-50" />
+                  <span className="text-gray-500 text-xs">%</span>
+                </div>
+                {grandTotal > 0 && (
+                  <span className="text-gray-400 text-xs w-28 text-right">₹ {fmt(grandTotal * m.percent / 100)}</span>
+                )}
+                <input type="date" value={m.due_date} onChange={e => updateMilestone(i, { due_date: e.target.value })}
+                  disabled={!canEdit || lockDone}
+                  className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-gray-400 text-xs focus:outline-none disabled:opacity-50" />
+                {canEdit && !lockDone && (
+                  <button onClick={() => removeMilestone(i)} className="text-gray-600 hover:text-red-400 transition-colors">
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
+            ))}
+            {canEdit && !lockDone && (
+              <button onClick={addMilestone} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-amber-400 transition-colors mt-1">
+                <Plus size={11} /> Add milestone
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── COMPLIANCE ──────────────────────────────────────────── */}
+      {isDirector && (
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden print:hidden">
+          <button onClick={() => setShowCompliance(v => !v)}
+            className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-800/50 transition-colors">
+            <span className="text-gray-400 font-semibold text-sm">Compliance — GST · PAN · Bank · TDS</span>
+            {showCompliance ? <ChevronUp size={14} className="text-gray-500" /> : <ChevronDown size={14} className="text-gray-500" />}
+          </button>
+          {showCompliance && (
+            <div className="px-5 pb-4 grid grid-cols-2 gap-3">
+              {([
+                ['gst_no', 'GST Number'], ['pan', 'PAN'], ['msme', 'MSME/Udyam'],
+                ['bank_name', 'Bank Name'], ['account_no', 'Account No.'], ['ifsc', 'IFSC Code'], ['tds', 'TDS Clause'],
+              ] as [keyof Compliance, string][]).map(([key, label]) => (
+                <div key={key}>
+                  <label className="text-gray-500 text-xs mb-1 block">{label}</label>
+                  <input value={compliance[key]} onChange={e => setCompliance(prev => ({ ...prev, [key]: e.target.value }))}
+                    disabled={lockDone}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50" />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
