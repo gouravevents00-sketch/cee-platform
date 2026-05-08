@@ -15,7 +15,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
 
   const { data: event } = await supabase
     .from('events')
-    .select('id, name, clients(name, contact_name, contact_phone, contact_email)')
+    .select('id, name, type, city, event_date, guest_count, clients(name, contact_name, contact_phone, contact_email)')
     .eq('id', id)
     .single()
 
@@ -47,6 +47,10 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
       <QuotationBuilder
         eventId={id}
         eventName={ev.name}
+        eventType={ev.type}
+        eventCity={ev.city}
+        eventDate={ev.event_date}
+        eventGuestCount={ev.guest_count}
         clientName={client?.name}
         clientContact={client?.contact_name}
         clientPhone={client?.contact_phone}

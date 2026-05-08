@@ -54,6 +54,10 @@ interface Compliance {
 interface Props {
   eventId: string
   eventName: string
+  eventType?: string
+  eventCity?: string
+  eventDate?: string
+  eventGuestCount?: string
   clientName?: string
   clientContact?: string
   clientPhone?: string
@@ -175,7 +179,8 @@ function numToWords(n: number): string {
 // ══════════════════════════════════════════════════════════════════
 
 export default function QuotationBuilder({
-  eventId, eventName, clientName, clientContact, clientPhone, clientEmail,
+  eventId, eventName, eventType, eventCity, eventDate, eventGuestCount,
+  clientName, clientContact, clientPhone, clientEmail,
   existingQuotation, eventElements, vendors, userRole,
 }: Props) {
   const isDirector = userRole === 'director'
@@ -454,7 +459,10 @@ export default function QuotationBuilder({
             lump_amount: 0,
           }
         })
-        setRows(prev => [...prev, ...parsed])
+        setRows(prev => {
+          const nonEmpty = prev.filter(r => r._type === 'section' || r.description?.trim())
+          return [...nonEmpty, ...parsed]
+        })
         setShowAI(false)
         setAiBrief('')
       } else {
@@ -495,7 +503,10 @@ export default function QuotationBuilder({
             lump_amount: 0,
           }
         })
-        setRows(prev => [...prev, ...parsed])
+        setRows(prev => {
+          const nonEmpty = prev.filter(r => r._type === 'section' || r.description?.trim())
+          return [...nonEmpty, ...parsed]
+        })
         setShowAI(false)
       } else {
         alert(data.error || 'No rows could be extracted from file')
@@ -833,10 +844,18 @@ export default function QuotationBuilder({
           <div className="px-8 py-4">
             <p className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: gold }}>Event Details</p>
             <div className="space-y-1 text-sm">
-              <div className="flex gap-3">
-                <span className="w-28 flex-shrink-0 text-xs" style={{ color: isClientPrint ? '#a0875a' : '#9ca3af' }}>Event Name</span>
-                <span className="font-semibold" style={{ color: isClientPrint ? '#2d2d2d' : '#111827' }}>{eventName}</span>
-              </div>
+              {[
+                ['Event Name', eventName],
+                ['Event Type', eventType],
+                ['City', eventCity],
+                ['Date', eventDate ? new Date(eventDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : null],
+                ['Expected Guests', eventGuestCount],
+              ].filter(([, val]) => val).map(([lbl, val]) => (
+                <div key={lbl as string} className="flex gap-3">
+                  <span className="w-28 flex-shrink-0 text-xs" style={{ color: isClientPrint ? '#a0875a' : '#9ca3af' }}>{lbl}</span>
+                  <span className="font-semibold leading-snug" style={{ color: isClientPrint ? '#2d2d2d' : '#111827' }}>{val}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -903,18 +922,20 @@ export default function QuotationBuilder({
                 <tr key={i} className="border-b group hover:bg-amber-50 transition-colors"
                   style={{ background: i % 2 === 0 ? rowEvenBg : rowOddBg, borderColor }}>
                   <td className="px-3 py-2 text-gray-400 text-xs text-center pl-8">{itemNum}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2 min-w-[180px]">
                     {row.is_lumpsum && (
                       <span className="text-xs text-amber-600 font-semibold mr-1">[LS]</span>
                     )}
-                    <input value={row.description || ''} onChange={e => updateRow(i, { description: e.target.value })}
+                    <textarea value={row.description || ''} onChange={e => updateRow(i, { description: e.target.value })}
                       disabled={!canEdit || lockDone} placeholder="Element name..."
-                      className={inputCls + ' disabled:opacity-70'} />
+                      rows={2}
+                      className={inputCls + ' disabled:opacity-70 resize-none leading-snug'} />
                   </td>
-                  <td className="px-3 py-2">
-                    <input value={row.specs || ''} onChange={e => updateRow(i, { specs: e.target.value })}
+                  <td className="px-3 py-2 min-w-[140px]">
+                    <textarea value={row.specs || ''} onChange={e => updateRow(i, { specs: e.target.value })}
                       disabled={!canEdit || lockDone} placeholder="Spec / material..."
-                      className={inputCls + ' disabled:opacity-70'} />
+                      rows={2}
+                      className={inputCls + ' disabled:opacity-70 resize-none leading-snug'} />
                   </td>
                   <td className="px-3 py-2">
                     <div className="space-y-0.5">
