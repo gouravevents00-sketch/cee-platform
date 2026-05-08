@@ -109,6 +109,16 @@ export default async function DashboardPage() {
 
   const attentionCount = (pendingApprovals?.length || 0) + (pendingExpenses?.length || 0) + (overdueVendorCount || 0) + phaseReadyEvents.length
 
+  // ── New Inquiries (from brief form) ──────────────────────
+  const { data: newInquiries } = isDirector
+    ? await supabase
+        .from('leads')
+        .select('id, name, contact_name, contact_phone, event_type, est_budget, created_at')
+        .eq('status', 'new')
+        .order('created_at', { ascending: false })
+        .limit(5)
+    : { data: [] }
+
   // ── My Tasks (non-director/accounts) ─────────────────────
   const { data: myTasks } = (!isDirector && !isAccounts)
     ? await supabase
@@ -144,6 +154,30 @@ export default async function DashboardPage() {
           >
             <CalendarDays size={15} /> New Event
           </Link>
+        </div>
+      )}
+
+      {/* ── New Inquiries ── */}
+      {isDirector && (newInquiries?.length || 0) > 0 && (
+        <div className="bg-green-950/20 border border-green-700/30 rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              <p className="text-green-300 font-semibold text-sm">{newInquiries!.length} new {newInquiries!.length === 1 ? 'inquiry' : 'inquiries'} from brief form</p>
+            </div>
+            <Link href="/dashboard/sales" className="text-xs text-green-500 hover:text-green-400">View all →</Link>
+          </div>
+          <div className="space-y-2">
+            {newInquiries!.map(lead => (
+              <Link key={lead.id} href="/dashboard/sales" className="flex items-center justify-between bg-gray-900/60 border border-gray-800 hover:border-green-700/40 rounded-xl px-3 py-2.5 transition-colors">
+                <div>
+                  <p className="text-white text-xs font-medium">{lead.contact_name || lead.name}</p>
+                  <p className="text-gray-500 text-xs">{lead.event_type}{lead.est_budget ? ` · ₹${lead.est_budget}` : ''}</p>
+                </div>
+                <p className="text-gray-600 text-xs">{new Date(lead.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
+              </Link>
+            ))}
+          </div>
         </div>
       )}
 
