@@ -4,20 +4,28 @@ import { fal } from '@fal-ai/client'
 fal.config({ credentials: process.env.FAL_KEY })
 
 const FILTER_CONFIG: Record<string, { prompt: string; strength: number }> = {
-  bollywood: {
-    prompt: 'bollywood movie poster style portrait, vibrant saturated colors, dramatic cinematic lighting, Indian cinema aesthetic, glossy film poster, stylized movie star look, rich colors',
-    strength: 0.75,
-  },
-  cartoon: {
-    prompt: 'anime illustration portrait, clean bold outlines, vibrant flat colors, manga style, digital art, smooth cel shading, cartoon character, expressive eyes',
-    strength: 0.80,
-  },
-  painting: {
-    prompt: 'classical oil painting portrait, impressionist style, visible brushstrokes, rich warm colors, fine art, canvas texture, rembrandt lighting, artistic masterpiece',
+  neon: {
+    prompt: 'cyberpunk neon portrait, glowing pink magenta and electric blue neon lights, dark rainy night city background, blade runner aesthetic, neon reflections on wet streets, volumetric fog, ultra detailed, cinematic',
     strength: 0.72,
   },
-  sketch: {
-    prompt: 'pencil sketch portrait, clean simple line art, black lines on white background, hand drawn sketch style, minimal shading, fine detail lines, professional illustration',
+  royal: {
+    prompt: 'Indian Maharaja royal portrait, elaborate ornate gold jewelry crown and headdress, rich brocade silk fabric, Mughal miniature painting style, jewel tones, regal palace backdrop, intricate patterns, majestic fine art illustration',
+    strength: 0.78,
+  },
+  magazine: {
+    prompt: 'Vogue fashion magazine cover portrait, high end editorial photography, dramatic studio lighting, luxury fashion aesthetic, flawless skin, sharp defined features, professional model pose, black and white with high contrast, glamorous',
+    strength: 0.65,
+  },
+  pixar: {
+    prompt: 'Pixar 3D animated character portrait, smooth stylized skin with subsurface scattering, large expressive eyes, warm soft studio lighting, Disney Pixar animation style, vibrant colors, cute heroic character design, high quality render',
+    strength: 0.80,
+  },
+  popart: {
+    prompt: 'Andy Warhol pop art screen print portrait, bold flat primary colors, high contrast halftone dots, graphic comic book style, red yellow blue and black, iconic pop art aesthetic, silkscreen texture, graphic design',
+    strength: 0.82,
+  },
+  ghibli: {
+    prompt: 'Studio Ghibli anime portrait, Hayao Miyazaki art style, soft warm golden hour lighting, hand drawn illustration, detailed expressive face, gentle dreamy atmosphere, lush green nature background, wholesome magical aesthetic',
     strength: 0.80,
   },
 }

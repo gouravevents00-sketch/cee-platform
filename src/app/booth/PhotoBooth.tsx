@@ -6,7 +6,7 @@ import NextImage from 'next/image'
 import { Camera, RefreshCw, Download, MessageCircle, Settings, Play, X } from 'lucide-react'
 
 type Stage = 'setup' | 'idle' | 'countdown' | 'captured' | 'processing' | 'result' | 'error'
-type FilterId = 'original' | 'bollywood' | 'cartoon' | 'painting' | 'sketch'
+type FilterId = 'original' | 'neon' | 'royal' | 'magazine' | 'pixar' | 'popart' | 'ghibli'
 type EventType = 'corporate' | 'wedding' | 'party' | 'brand'
 
 interface Filter {
@@ -17,11 +17,13 @@ interface Filter {
 }
 
 const FILTERS: Filter[] = [
-  { id: 'original',  label: 'Original',   emoji: '📸', borderColor: 'border-gray-600' },
-  { id: 'bollywood', label: 'Bollywood',   emoji: '🎬', borderColor: 'border-pink-500' },
-  { id: 'cartoon',   label: 'Cartoon',     emoji: '🎨', borderColor: 'border-blue-500' },
-  { id: 'painting',  label: 'Painting',    emoji: '🖼️', borderColor: 'border-amber-500' },
-  { id: 'sketch',    label: 'Sketch',      emoji: '✏️', borderColor: 'border-purple-500' },
+  { id: 'original', label: 'Original',  emoji: '📸', borderColor: 'border-gray-600' },
+  { id: 'neon',     label: 'Neon City', emoji: '💜', borderColor: 'border-purple-500' },
+  { id: 'royal',    label: 'Royal',     emoji: '👑', borderColor: 'border-yellow-400' },
+  { id: 'magazine', label: 'Magazine',  emoji: '✨', borderColor: 'border-white' },
+  { id: 'pixar',    label: 'Pixar 3D',  emoji: '🎪', borderColor: 'border-blue-400' },
+  { id: 'popart',   label: 'Pop Art',   emoji: '🎨', borderColor: 'border-red-500' },
+  { id: 'ghibli',   label: 'Ghibli',    emoji: '🌿', borderColor: 'border-green-400' },
 ]
 
 const COUNTDOWN_FROM = 3
