@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
   Plus, Trash2, Printer, Save, Send, Upload, ListPlus,
-  Lock, Wand2, ChevronDown, ChevronUp, Eye, EyeOff, CheckCircle2, Copy, Check,
+  Lock, Wand2, ChevronDown, ChevronUp, Eye, EyeOff, CheckCircle2, Copy, Check, MessageSquare,
 } from 'lucide-react'
 
 // ══════════════════════════════════════════════════════════════════
@@ -49,6 +49,14 @@ interface Compliance {
   account_no: string
   ifsc: string
   tds: string
+  service_fee?: number
+}
+
+interface ClientTokenStatus {
+  status: string
+  clientDecision?: string
+  clientNote?: string
+  decidedAt?: string
 }
 
 interface Props {
@@ -57,7 +65,6 @@ interface Props {
   eventType?: string
   eventCity?: string
   eventDate?: string
-  eventGuestCount?: string
   clientName?: string
   clientContact?: string
   clientPhone?: string
@@ -66,6 +73,7 @@ interface Props {
   eventElements: any[]
   vendors: { id: string; name: string; category?: string }[]
   userRole: string
+  clientTokenStatus?: ClientTokenStatus
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -120,23 +128,24 @@ const EMPTY_ITEM: QuoteRow = {
 // HELPERS
 // ══════════════════════════════════════════════════════════════════
 
-/** Parse dimension string → area in sq.ft.
- *  "20×10"  → 200   "32×12×4" → uses first two dims → 384
- *  "15 rft" → 15    "Lumpsum" → 0   "8x4 ft" → 32
- */
 function parseDimStr(s: string): number {
   if (!s) return 0
   const lower = s.toLowerCase().trim()
   if (lower === 'lumpsum' || lower === 'ls') return 0
-  // rft / running feet
-  const rftMatch = lower.match(/^([\d.]+)\s*(?:rft|running|rft\.?)/)
+  // running feet — check before stripping units
+  const rftMatch = lower.match(/([\d.]+)\s*(?:rft|running\s*ft|r\.?ft\.?)/)
   if (rftMatch) return parseFloat(rftMatch[1])
-  // WxH or WxHxD — take first two numbers
-  const dimMatch = lower.match(/([\d.]+)\s*[×x*]\s*([\d.]+)/)
+  // strip unit words so "20 ft × 10 ft", "20'×10'" etc. all work
+  const stripped = lower.replace(/\bfeet\b|\bfoot\b|\bft\b|\bmtr\b|'|"/g, '').trim()
+  // WxH (handles "20×10", "20 x 10", "20*10", "20 x 10 ft")
+  const dimMatch = stripped.match(/([\d.]+)\s*[×x*]\s*([\d.]+)/)
   if (dimMatch) return parseFloat(dimMatch[1]) * parseFloat(dimMatch[2])
-  // single number
-  const num = parseFloat(lower)
-  return isNaN(num) ? 0 : num
+  // single number — skip if it's a quantity (nos, pcs, unit)
+  if (!/\b(?:nos?|pcs?|unit|set|panel)\b/.test(lower)) {
+    const num = parseFloat(lower)
+    if (!isNaN(num)) return num
+  }
+  return 0
 }
 
 function rowAmount(r: QuoteRow): number {
@@ -159,6 +168,11 @@ function fmt(n: number): string {
   return Math.round(n).toLocaleString('en-IN')
 }
 
+function toTitleCase(s: string) {
+  if (!s) return s
+  return s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+}
+
 function numToWords(n: number): string {
   if (n <= 0) return ''
   const ones = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
@@ -179,9 +193,9 @@ function numToWords(n: number): string {
 // ══════════════════════════════════════════════════════════════════
 
 export default function QuotationBuilder({
-  eventId, eventName, eventType, eventCity, eventDate, eventGuestCount,
+  eventId, eventName, eventType, eventCity, eventDate,
   clientName, clientContact, clientPhone, clientEmail,
-  existingQuotation, eventElements, vendors, userRole,
+  existingQuotation, eventElements, vendors, userRole, clientTokenStatus,
 }: Props) {
   const isDirector = userRole === 'director'
   const canEdit = ['director', 'accounts', 'admin'].includes(userRole)
@@ -248,6 +262,8 @@ export default function QuotationBuilder({
   const [shareCopied, setShareCopied] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [showVendorCol, setShowVendorCol] = useState(false)
+  const [serviceFee, setServiceFee] = useState<number>(Number(existing?.compliance?.service_fee) || 0)
+  const [showServiceFee, setShowServiceFee] = useState((Number(existing?.compliance?.service_fee) || 0) > 0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const aiFileRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
@@ -265,10 +281,12 @@ export default function QuotationBuilder({
   const totalMargin = subtotal - totalVendorCost
   const discountAmt = showDiscount ? subtotal * discountPct / 100 : 0
   const afterDiscount = subtotal - discountAmt
-  const gstAmt = gstMode === 'exclusive' ? afterDiscount * 0.18
-    : gstMode === 'inclusive' ? afterDiscount * 18 / 118
+  const serviceFeeAmt = showServiceFee ? serviceFee : 0
+  const taxableAmount = afterDiscount + serviceFeeAmt
+  const gstAmt = gstMode === 'exclusive' ? taxableAmount * 0.18
+    : gstMode === 'inclusive' ? taxableAmount * 18 / 118
     : 0
-  const grandTotal = gstMode === 'exclusive' ? afterDiscount + gstAmt : afterDiscount
+  const grandTotal = gstMode === 'exclusive' ? taxableAmount + gstAmt : taxableAmount
 
   // ── Row operations ─────────────────────────────────────────────
   const updateRow = useCallback((i: number, patch: Partial<QuoteRow>) => {
@@ -339,7 +357,7 @@ export default function QuotationBuilder({
       notes: notes || null,
       status: effectiveStatus,
       payment_milestones: milestones,
-      compliance,
+      compliance: { ...compliance, service_fee: showServiceFee ? serviceFee : 0 },
       company,
     }
     if (quoteId) {
@@ -574,6 +592,51 @@ export default function QuotationBuilder({
     e.target.value = ''
   }
 
+  // ── Download Blank CSV Template ────────────────────────────────
+  function downloadTemplate() {
+    const headers = [
+      'Type (item/section)',
+      'Description / Element Name',
+      'Specification / Details',
+      'Dimensions (20x10 ft / 15 rft / Lumpsum)',
+      'Days',
+      'Qty',
+      'Client Rate (₹)',
+      'Vendor Rate (₹)',
+      'Is Lumpsum (yes/no)',
+      'Lumpsum Amount (₹)',
+    ]
+    const examples: string[][] = [
+      ['section', 'STAGE & BACKDROP', '', '', '', '', '', '', '', ''],
+      ['item', 'Main Stage Setup', 'Wooden stage, carpeted surface', '20x10 ft', '1', '1', '50000', '35000', 'no', ''],
+      ['item', 'Backdrop Flex Print', 'Single side UV print, iron frame', '20x8 ft', '1', '1', '12000', '8000', 'no', ''],
+      ['section', 'AUDIO VISUAL', '', '', '', '', '', '', '', ''],
+      ['item', 'LED Screen P3.9', 'Indoor grade, truss mounted', '10x8 ft', '1', '1', '80000', '60000', 'no', ''],
+      ['item', 'PA Sound System', 'Complete audio package - lumpsum', 'Lumpsum', '1', '1', '', '', 'yes', '65000'],
+      ['section', 'FURNITURE', '', '', '', '', '', '', '', ''],
+      ['item', 'Banquet Chair', 'White padded, stackable', '', '1', '100', '150', '100', 'no', ''],
+      ['item', 'Cocktail Table', 'Round 4ft, draped', '', '1', '20', '500', '300', 'no', ''],
+    ]
+    const instructionLines = [
+      '# CEE Quotation Template — Fill this file and upload via "AI: Parse Brief > Upload Sheet"',
+      '# TYPE column: use "item" for elements, "section" for category headers (section rows ignore all other columns)',
+      '# DIMENSIONS: write like "20x10 ft", "15 rft", or leave blank for quantity-based items',
+      '# LUMPSUM: if the whole item is a fixed cost, set Is Lumpsum = yes and fill Lumpsum Amount — leave Client Rate blank',
+      '# VENDOR RATE is internal only — client will not see it',
+      '#',
+    ]
+    const csvRows = [
+      ...instructionLines,
+      headers.map(h => `"${h}"`).join(','),
+      ...examples.map(row => row.map(v => `"${v}"`).join(',')),
+    ]
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `CEE_Quote_Template_${(eventName || 'Event').replace(/[^a-z0-9]/gi, '_')}.csv`
+    a.click()
+  }
+
   // ── Print ──────────────────────────────────────────────────────
   function handlePrint(view: PrintView) {
     setPrintView(view)
@@ -693,6 +756,58 @@ export default function QuotationBuilder({
         </div>
       </div>
 
+      {/* ── CLIENT DECISION BANNER ───────────────────────────────── */}
+      {clientTokenStatus?.clientDecision && (
+        <div className={`rounded-2xl border px-5 py-4 print:hidden ${
+          clientTokenStatus.clientDecision === 'accepted'
+            ? 'bg-green-950/60 border-green-800'
+            : 'bg-blue-950/60 border-blue-800'
+        }`}>
+          <div className="flex items-start gap-3">
+            {clientTokenStatus.clientDecision === 'accepted'
+              ? <CheckCircle2 size={20} className="text-green-400 flex-shrink-0 mt-0.5" />
+              : <MessageSquare size={20} className="text-blue-400 flex-shrink-0 mt-0.5" />}
+            <div className="flex-1 min-w-0">
+              <p className={`font-semibold text-sm ${clientTokenStatus.clientDecision === 'accepted' ? 'text-green-400' : 'text-blue-400'}`}>
+                {clientTokenStatus.clientDecision === 'accepted' ? 'Client Accepted the Quotation' : 'Client Requested Changes'}
+              </p>
+              {clientTokenStatus.decidedAt && (
+                <p className="text-gray-500 text-xs mt-0.5">
+                  {new Date(clientTokenStatus.decidedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                </p>
+              )}
+              {clientTokenStatus.clientNote && (() => {
+                let parsed: any = null
+                try { parsed = JSON.parse(clientTokenStatus.clientNote!) } catch {}
+                if (parsed?.general !== undefined) {
+                  return (
+                    <div className="mt-2 space-y-2">
+                      {parsed.general && <p className="text-gray-300 text-sm italic">"{parsed.general}"</p>}
+                      {parsed.items?.filter((it: any) => it.suggestedAmount || it.comment).length > 0 && (
+                        <div className="bg-black/20 rounded-xl px-3 py-2.5 space-y-2">
+                          <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Per-item feedback</p>
+                          {parsed.items.filter((it: any) => it.suggestedAmount || it.comment).map((it: any, i: number) => (
+                            <div key={i} className="text-xs space-y-0.5">
+                              <p className="font-medium text-gray-300">{it.description}</p>
+                              {it.suggestedAmount && <p className="text-amber-400">Suggested amount: ₹{Number(it.suggestedAmount).toLocaleString('en-IN')}</p>}
+                              {it.comment && <p className="text-gray-400 italic">"{it.comment}"</p>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                }
+                return <p className="text-gray-300 text-sm italic mt-1.5">"{clientTokenStatus.clientNote}"</p>
+              })()}
+              {clientTokenStatus.clientDecision === 'accepted' && (
+                <p className="text-green-400/70 text-xs mt-2">Ready to lock → Lock &amp; Activate will generate elements, SOs and payments.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── ROW 2: BUILD TOOLS (only when editing) ───────────────── */}
       {canEdit && !lockDone && (
         <div className="flex items-center gap-2 flex-wrap print:hidden">
@@ -729,6 +844,10 @@ export default function QuotationBuilder({
               <input type="checkbox" checked={showDiscount} onChange={e => setShowDiscount(e.target.checked)} disabled={lockDone} />
               Discount
             </label>
+            <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+              <input type="checkbox" checked={showServiceFee} onChange={e => setShowServiceFee(e.target.checked)} disabled={lockDone} />
+              Agency Fee
+            </label>
             <select value={gstMode} onChange={e => setGstMode(e.target.value as GSTMode)} disabled={lockDone}
               className="bg-gray-900 border border-gray-700 text-gray-400 text-xs rounded-lg px-2 py-1.5 focus:outline-none disabled:opacity-50">
               <option value="none">No GST</option>
@@ -745,8 +864,9 @@ export default function QuotationBuilder({
             )}
           </div>
 
-          {/* JSON backup */}
+          {/* Template + JSON backup */}
           <div className="ml-auto flex items-center gap-1.5">
+            <button onClick={downloadTemplate} className="text-xs text-amber-600 hover:text-amber-400 transition-colors px-2 py-1 rounded-lg hover:bg-gray-800 border border-amber-900/50">⬇ Template</button>
             <button onClick={exportJSON} className="text-xs text-gray-600 hover:text-gray-400 transition-colors px-2 py-1 rounded-lg hover:bg-gray-800">Export JSON</button>
             <button onClick={() => fileInputRef.current?.click()} className="text-xs text-gray-600 hover:text-gray-400 transition-colors px-2 py-1 rounded-lg hover:bg-gray-800">Load JSON</button>
           </div>
@@ -802,7 +922,7 @@ export default function QuotationBuilder({
       ══════════════════════════════════════════════════════════ */}
 
       <div
-        className="rounded-2xl overflow-hidden shadow-2xl print:shadow-none print:rounded-none"
+        className="rounded-2xl overflow-x-auto shadow-2xl print:shadow-none print:rounded-none"
         id="quotation-doc"
         style={{ background: docBg, color: isClientPrint ? '#2d2d2d' : '#1a1a2e', fontFamily: isClientPrint ? "'Georgia', serif" : 'inherit' }}>
 
@@ -829,8 +949,8 @@ export default function QuotationBuilder({
             <p className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: gold }}>Client Details</p>
             <div className="space-y-1 text-sm">
               {[
-                ['Client / Company', clientName],
-                ['Contact Person', clientContact],
+                ['Client / Company', clientName ? toTitleCase(clientName) : null],
+                ['Contact Person', clientContact ? toTitleCase(clientContact) : null],
                 ['Phone', clientPhone],
                 ['Email', clientEmail],
               ].map(([lbl, val]) => (
@@ -846,10 +966,9 @@ export default function QuotationBuilder({
             <div className="space-y-1 text-sm">
               {[
                 ['Event Name', eventName],
-                ['Event Type', eventType],
-                ['City', eventCity],
+                ['Event Type', eventType ? toTitleCase(eventType) : null],
+                ['City', eventCity ? toTitleCase(eventCity) : null],
                 ['Date', eventDate ? new Date(eventDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : null],
-                ['Expected Guests', eventGuestCount],
               ].filter(([, val]) => val).map(([lbl, val]) => (
                 <div key={lbl as string} className="flex gap-3">
                   <span className="w-28 flex-shrink-0 text-xs" style={{ color: isClientPrint ? '#a0875a' : '#9ca3af' }}>{lbl}</span>
@@ -869,41 +988,49 @@ export default function QuotationBuilder({
         <table className="w-full border-collapse text-sm" style={{ background: docBg }}>
           <thead>
             <tr style={{ background: tableHeaderBg }}>
-              <th className="text-left px-3 py-2.5 text-white text-xs font-bold uppercase tracking-wide w-8 pl-8">#</th>
-              <th className="text-left px-3 py-2.5 text-white text-xs font-bold uppercase tracking-wide">Element / Item</th>
-              <th className="text-left px-3 py-2.5 text-white text-xs font-bold uppercase tracking-wide">Specification</th>
-              <th className="text-left px-3 py-2.5 text-white text-xs font-bold uppercase tracking-wide w-28">Dimensions</th>
-              <th className="text-center px-2 py-2.5 text-white text-xs font-bold uppercase tracking-wide w-14">Days</th>
-              <th className="text-center px-2 py-2.5 text-white text-xs font-bold uppercase tracking-wide w-14">Qty</th>
-              <th className="text-right px-2 py-2.5 text-white text-xs font-bold uppercase tracking-wide w-24">Rate (₹)</th>
+              <th className="text-left px-3 py-2.5 text-white text-xs font-bold uppercase tracking-wide w-8 pl-8 whitespace-nowrap">#</th>
+              <th className="text-left px-3 py-2.5 text-white text-xs font-bold uppercase tracking-wide min-w-[160px]">Element / Item</th>
+              <th className="text-left px-3 py-2.5 text-white text-xs font-bold uppercase tracking-wide min-w-[120px]">Specification</th>
+              <th className="text-left px-3 py-2.5 text-white text-xs font-bold uppercase tracking-wide w-24 whitespace-nowrap">Dimensions</th>
+              <th className="text-center px-2 py-2.5 text-white text-xs font-bold uppercase tracking-wide w-12 whitespace-nowrap">Days</th>
+              <th className="text-center px-2 py-2.5 text-white text-xs font-bold uppercase tracking-wide w-12 whitespace-nowrap">Qty</th>
+              <th className="text-right px-2 py-2.5 text-white text-xs font-bold uppercase tracking-wide w-24 whitespace-nowrap">Rate</th>
               {/* Vendor cols — internal only */}
               {isDirector && showVendorCol && !isClientPrint && (
                 <>
-                  <th className="text-right px-2 py-2.5 text-amber-300 text-xs font-bold uppercase tracking-wide w-24 print:hidden">Vend Rate</th>
-                  <th className="text-right px-2 py-2.5 text-green-300 text-xs font-bold uppercase tracking-wide w-20 print:hidden">Margin</th>
-                  <th className="text-left px-2 py-2.5 text-amber-300 text-xs font-bold uppercase tracking-wide w-28 print:hidden">Vendor</th>
+                  <th className="text-right px-2 py-2.5 text-amber-300 text-xs font-bold uppercase tracking-wide w-22 print:hidden whitespace-nowrap">Vend Rate</th>
+                  <th className="text-right px-2 py-2.5 text-green-300 text-xs font-bold uppercase tracking-wide w-20 print:hidden whitespace-nowrap">Margin</th>
+                  <th className="text-left px-2 py-2.5 text-amber-300 text-xs font-bold uppercase tracking-wide w-28 print:hidden whitespace-nowrap">Vendor</th>
                 </>
               )}
-              <th className="text-right px-3 py-2.5 pr-8 text-white text-xs font-bold uppercase tracking-wide w-28">Amount (₹)</th>
+              <th className="text-right px-3 py-2.5 pr-8 text-white text-xs font-bold uppercase tracking-wide w-32 whitespace-nowrap">Amount (₹)</th>
               <th className="w-6 print:hidden"></th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row, i) => {
               const itemNum = rows.slice(0, i + 1).filter(r => r._type === 'item').length
+              // In client print or locked/view-only, render clean text (no form fields)
+              const readOnly = isClientPrint || lockDone || !canEdit
+
               if (row._type === 'section') {
                 const colSpan = isDirector && showVendorCol && !isClientPrint ? 11 : 8
                 return (
                   <tr key={i} style={{ background: internalBg }}>
                     <td colSpan={colSpan} className="px-8 py-2">
-                      <input
-                        value={row.label || ''}
-                        onChange={e => updateRow(i, { label: e.target.value })}
-                        disabled={!canEdit || lockDone}
-                        placeholder="— Section Header —"
-                        className="bg-transparent text-xs font-black uppercase tracking-widest w-full focus:outline-none print:pointer-events-none disabled:opacity-70"
-                        style={{ color: gold }}
-                      />
+                      {readOnly ? (
+                        <p className="text-xs font-black uppercase tracking-widest" style={{ color: gold }}>
+                          {row.label || 'SECTION'}
+                        </p>
+                      ) : (
+                        <input
+                          value={row.label || ''}
+                          onChange={e => updateRow(i, { label: e.target.value })}
+                          placeholder="— Section Header —"
+                          className="bg-transparent text-xs font-black uppercase tracking-widest w-full focus:outline-none"
+                          style={{ color: gold }}
+                        />
+                      )}
                     </td>
                     <td className="print:hidden" style={{ background: internalBg }}>
                       {canEdit && !lockDone && (
@@ -917,80 +1044,117 @@ export default function QuotationBuilder({
               const amt = rowAmount(row)
               const vCost = rowVendorCost(row)
               const margin = amt - vCost
+              const descColor = isClientPrint ? '#1a1a1a' : '#111827'
+              const specColor = isClientPrint ? '#6b5b45' : '#6b7280'
+              const dimColor = isClientPrint ? '#2d2d2d' : '#374151'
+              const sqftColor = isClientPrint ? '#a0875a' : '#9ca3af'
 
               return (
-                <tr key={i} className="border-b group hover:bg-amber-50 transition-colors"
+                <tr key={i} className="border-b group hover:bg-amber-50/40 transition-colors"
                   style={{ background: i % 2 === 0 ? rowEvenBg : rowOddBg, borderColor }}>
-                  <td className="px-3 py-2 text-gray-400 text-xs text-center pl-8">{itemNum}</td>
-                  <td className="px-3 py-2 min-w-[180px]">
-                    {row.is_lumpsum && (
-                      <span className="text-xs text-amber-600 font-semibold mr-1">[LS]</span>
+                  <td className="px-3 py-2.5 text-xs text-center pl-8" style={{ color: specColor }}>{itemNum}</td>
+
+                  {/* Description */}
+                  <td className="px-3 py-2.5 min-w-[180px]">
+                    {row.is_lumpsum && <span className="text-xs text-amber-600 font-semibold mr-1">[LS]</span>}
+                    {readOnly ? (
+                      <p className="text-sm font-medium leading-snug whitespace-pre-wrap" style={{ color: descColor }}>
+                        {row.description || '—'}
+                      </p>
+                    ) : (
+                      <textarea value={row.description || ''} onChange={e => updateRow(i, { description: e.target.value })}
+                        placeholder="Element name..." rows={2}
+                        className={inputCls + ' resize-none leading-snug font-medium'} />
                     )}
-                    <textarea value={row.description || ''} onChange={e => updateRow(i, { description: e.target.value })}
-                      disabled={!canEdit || lockDone} placeholder="Element name..."
-                      rows={2}
-                      className={inputCls + ' disabled:opacity-70 resize-none leading-snug'} />
                   </td>
-                  <td className="px-3 py-2 min-w-[140px]">
-                    <textarea value={row.specs || ''} onChange={e => updateRow(i, { specs: e.target.value })}
-                      disabled={!canEdit || lockDone} placeholder="Spec / material..."
-                      rows={2}
-                      className={inputCls + ' disabled:opacity-70 resize-none leading-snug'} />
+
+                  {/* Specification */}
+                  <td className="px-3 py-2.5 min-w-[140px]">
+                    {readOnly ? (
+                      <p className="text-xs leading-snug whitespace-pre-wrap" style={{ color: specColor }}>
+                        {row.specs || ''}
+                      </p>
+                    ) : (
+                      <textarea value={row.specs || ''} onChange={e => updateRow(i, { specs: e.target.value })}
+                        placeholder="Spec / material..." rows={2}
+                        className="bg-transparent text-xs focus:outline-none w-full resize-none leading-snug placeholder-gray-400"
+                        style={{ color: specColor }} />
+                    )}
                   </td>
-                  <td className="px-3 py-2">
+
+                  {/* Dimensions */}
+                  <td className="px-3 py-2.5">
                     <div className="space-y-0.5">
-                      <input value={row.dim_str || ''} onChange={e => updateRow(i, { dim_str: e.target.value })}
-                        disabled={!canEdit || lockDone} placeholder="20×10 ft"
-                        className={inputCls + ' disabled:opacity-70 text-xs'} />
+                      {readOnly ? (
+                        <p className="text-xs" style={{ color: dimColor }}>{row.dim_str || '—'}</p>
+                      ) : (
+                        <input value={row.dim_str || ''} onChange={e => updateRow(i, { dim_str: e.target.value })}
+                          placeholder="L×W ft"
+                          className={inputCls + ' text-xs'} />
+                      )}
                       {(row.area_sqft || 0) > 0 && (
-                        <p className="text-xs text-gray-400">{row.area_sqft} sq.ft</p>
+                        <p className="text-xs" style={{ color: sqftColor }}>{row.area_sqft} sq.ft</p>
                       )}
                     </div>
                   </td>
-                  <td className="px-2 py-2">
-                    <input type="number" value={row.days ?? 1} min="0"
-                      onChange={e => updateRow(i, { days: Number(e.target.value) })}
-                      disabled={!canEdit || lockDone}
-                      className="text-center text-sm focus:outline-none w-12 bg-transparent text-gray-900 print:pointer-events-none disabled:opacity-70" />
+
+                  {/* Days */}
+                  <td className="px-2 py-2.5 text-center">
+                    {readOnly ? (
+                      <span className="text-sm" style={{ color: dimColor }}>{row.days ?? 1}</span>
+                    ) : (
+                      <input type="number" value={row.days ?? 1} min="0"
+                        onChange={e => updateRow(i, { days: Number(e.target.value) })}
+                        className="text-center text-sm focus:outline-none w-12 bg-transparent" style={{ color: dimColor }} />
+                    )}
                   </td>
-                  <td className="px-2 py-2">
-                    <input type="number" value={row.qty ?? 1} min="0"
-                      onChange={e => updateRow(i, { qty: Number(e.target.value) })}
-                      disabled={!canEdit || lockDone}
-                      className="text-center text-sm focus:outline-none w-12 bg-transparent text-gray-900 print:pointer-events-none disabled:opacity-70" />
+
+                  {/* Qty */}
+                  <td className="px-2 py-2.5 text-center">
+                    {readOnly ? (
+                      <span className="text-sm" style={{ color: dimColor }}>{row.qty ?? 1}</span>
+                    ) : (
+                      <input type="number" value={row.qty ?? 1} min="0"
+                        onChange={e => updateRow(i, { qty: Number(e.target.value) })}
+                        className="text-center text-sm focus:outline-none w-12 bg-transparent" style={{ color: dimColor }} />
+                    )}
                   </td>
-                  <td className="px-2 py-2">
-                    {row.is_lumpsum ? (
+
+                  {/* Rate */}
+                  <td className="px-2 py-2.5 text-right">
+                    {readOnly ? (
+                      <span className="text-sm" style={{ color: dimColor }}>
+                        {row.is_lumpsum ? `₹ ${fmt(row.lump_amount || 0)}` : (row.rate ? `₹ ${fmt(row.rate)}` : '—')}
+                      </span>
+                    ) : row.is_lumpsum ? (
                       <input type="number" value={row.lump_amount ?? 0} min="0"
                         onChange={e => updateRow(i, { lump_amount: Number(e.target.value) })}
-                        disabled={!canEdit || lockDone}
                         placeholder="Fixed amt"
-                        className="text-right text-sm focus:outline-none w-24 bg-amber-50 text-amber-700 font-semibold rounded px-1 print:pointer-events-none disabled:opacity-70" />
+                        className="text-right text-sm focus:outline-none w-24 bg-amber-50 text-amber-700 font-semibold rounded px-1" />
                     ) : (
                       <input type="number" value={row.rate ?? 0} min="0"
                         onChange={e => updateRow(i, { rate: Number(e.target.value) })}
-                        disabled={!canEdit || lockDone}
-                        className="text-right text-sm focus:outline-none w-20 bg-transparent text-gray-900 print:pointer-events-none disabled:opacity-70" />
+                        className="text-right text-sm focus:outline-none w-20 bg-transparent" style={{ color: dimColor }} />
                     )}
                   </td>
 
                   {/* Vendor columns — internal only */}
                   {isDirector && showVendorCol && !isClientPrint && (
                     <>
-                      <td className="px-2 py-2 print:hidden">
+                      <td className="px-2 py-2.5 print:hidden">
                         {!row.is_lumpsum && (
                           <input type="number" value={row.vendor_rate ?? 0} min="0"
                             onChange={e => updateRow(i, { vendor_rate: Number(e.target.value) })}
                             disabled={lockDone}
-                            className="text-right text-sm focus:outline-none w-20 bg-amber-50 text-amber-700 rounded px-1 print:pointer-events-none disabled:opacity-70" />
+                            className="text-right text-sm focus:outline-none w-20 bg-amber-50 text-amber-700 rounded px-1 disabled:opacity-70" />
                         )}
                       </td>
-                      <td className="px-2 py-2 text-right print:hidden">
+                      <td className="px-2 py-2.5 text-right print:hidden">
                         <span className={`text-xs font-semibold ${margin >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                           {margin > 0 ? '+' : ''}{margin ? `₹${fmt(margin)}` : '—'}
                         </span>
                       </td>
-                      <td className="px-2 py-2 print:hidden">
+                      <td className="px-2 py-2.5 print:hidden">
                         <select
                           value={row.vendor_id || ''}
                           onChange={e => updateRow(i, { vendor_id: e.target.value })}
@@ -1005,13 +1169,15 @@ export default function QuotationBuilder({
                     </>
                   )}
 
-                  <td className="px-3 py-2 pr-8 text-right font-semibold" style={{ color: isClientPrint ? '#a0875a' : '#374151' }}>
+                  {/* Amount */}
+                  <td className="px-3 py-2.5 pr-8 text-right font-semibold" style={{ color: isClientPrint ? '#a0875a' : '#374151' }}>
                     {amt ? `₹ ${fmt(amt)}` : '—'}
                   </td>
+
+                  {/* Row actions */}
                   <td className="print:hidden">
                     {canEdit && !lockDone && (
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                        {/* Lumpsum toggle */}
                         <button
                           onClick={() => updateRow(i, { is_lumpsum: !row.is_lumpsum })}
                           className={`text-xs px-1 py-0.5 rounded transition-colors ${row.is_lumpsum ? 'bg-amber-200 text-amber-700' : 'text-gray-400 hover:text-amber-500'}`}
@@ -1105,6 +1271,20 @@ export default function QuotationBuilder({
                   )}
                 </span>
                 <span className="text-red-600 font-semibold">- ₹ {fmt(discountAmt)}</span>
+              </div>
+            )}
+
+            {showServiceFee && (
+              <div className="flex items-center justify-between py-1 border-b" style={{ borderColor }}>
+                <span style={{ color: isClientPrint ? '#6b5b45' : '#6b7280' }} className="flex items-center gap-2">
+                  Agency / Service Fee
+                  {canEdit && !lockDone && (
+                    <input type="number" value={serviceFee} min="0"
+                      onChange={e => setServiceFee(Number(e.target.value))}
+                      className="w-24 border border-gray-300 rounded px-1 py-0.5 text-xs text-right focus:outline-none" />
+                  )}
+                </span>
+                <span className="font-semibold">₹ {fmt(serviceFeeAmt)}</span>
               </div>
             )}
 

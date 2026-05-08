@@ -15,7 +15,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
 
   const { data: event } = await supabase
     .from('events')
-    .select('id, name, type, city, event_date, guest_count, clients(name, contact_name, contact_phone, contact_email)')
+    .select('id, name, type, city, event_date, clients(name, contact_name, contact_phone, contact_email)')
     .eq('id', id)
     .single()
 
@@ -32,6 +32,25 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
       .eq('event_id', id).neq('status', 'cancelled').order('created_at'),
     supabase.from('vendors').select('id, name, category').order('name'),
   ])
+
+  // Fetch client's latest token decision for this quotation
+  const { data: tokenRow } = quotation?.id
+    ? await supabase
+        .from('quotation_tokens')
+        .select('status, client_decision, client_note, decided_at')
+        .eq('quotation_id', quotation.id)
+        .not('client_decision', 'is', null)
+        .order('decided_at', { ascending: false })
+        .limit(1)
+        .single()
+    : { data: null }
+
+  const clientTokenStatus = tokenRow ? {
+    status: tokenRow.status,
+    clientDecision: tokenRow.client_decision,
+    clientNote: tokenRow.client_note,
+    decidedAt: tokenRow.decided_at,
+  } : undefined
 
   const client = (event as any).clients
   const ev = event as any
@@ -50,7 +69,6 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
         eventType={ev.type}
         eventCity={ev.city}
         eventDate={ev.event_date}
-        eventGuestCount={ev.guest_count}
         clientName={client?.name}
         clientContact={client?.contact_name}
         clientPhone={client?.contact_phone}
@@ -59,6 +77,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
         eventElements={(elements || []) as any[]}
         vendors={(vendors || []) as { id: string; name: string; category?: string }[]}
         userRole={profile.role}
+        clientTokenStatus={clientTokenStatus}
       />
     </div>
   )

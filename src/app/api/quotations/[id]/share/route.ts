@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { autoCompleteTasks, KEYWORDS_QUOTATION_SENT } from '@/lib/autoCompleteTasks'
 
 // POST /api/quotations/[id]/share — generate shareable client view link
 export async function POST(
@@ -49,6 +50,12 @@ export async function POST(
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Auto-complete "quotation sent" tasks
+  await autoCompleteTasks(
+    supabase, quot.event_id, user.id, KEYWORDS_QUOTATION_SENT,
+    'Auto-completed: Quotation shared with client.'
+  )
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://cee-platform.vercel.app'
   return NextResponse.json({ token: data.token, link: `${baseUrl}/quote/${data.token}` })

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { CheckCircle2, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react'
+import { CheckCircle2, MessageSquare, Download } from 'lucide-react'
 
 function fmt(n: number) { return Math.round(n).toLocaleString('en-IN') }
 
@@ -32,8 +32,14 @@ export default function ClientQuoteView({
   const [decision, setDecision] = useState<'accepted' | 'changes_requested' | null>(null)
   const [note, setNote] = useState('')
   const [done, setDone] = useState(alreadyDecided)
-  const [showChanges, setShowChanges] = useState(false)
-  const [showSections, setShowSections] = useState<Record<number, boolean>>({})
+  const [itemFeedbacks, setItemFeedbacks] = useState<Record<number, { suggestedAmount: string; comment: string }>>({})
+
+  function updateItemFeedback(idx: number, patch: Partial<{ suggestedAmount: string; comment: string }>) {
+    setItemFeedbacks(prev => {
+      const existing = prev[idx] || { suggestedAmount: '', comment: '' }
+      return { ...prev, [idx]: { ...existing, ...patch } }
+    })
+  }
 
   const event = quot.events
   const client = event?.clients
@@ -77,10 +83,24 @@ export default function ClientQuoteView({
     if (!decision) return
     if (decision === 'changes_requested' && !note.trim()) return
     setSubmitting(true)
+    // Build structured note for changes_requested
+    let notePayload = note
+    if (decision === 'changes_requested') {
+      const itemsWithFeedback = Object.entries(itemFeedbacks)
+        .filter(([, f]) => f.suggestedAmount || f.comment)
+        .map(([idx, f]) => ({
+          description: items[Number(idx)]?.description || '',
+          suggestedAmount: f.suggestedAmount ? Number(f.suggestedAmount) : null,
+          comment: f.comment || null,
+        }))
+      if (itemsWithFeedback.length > 0) {
+        notePayload = JSON.stringify({ general: note, items: itemsWithFeedback })
+      }
+    }
     const res = await fetch(`/api/quote/${token}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ decision, note }),
+      body: JSON.stringify({ decision, note: notePayload }),
     })
     if (res.ok) setDone(true)
     setSubmitting(false)
@@ -276,23 +296,34 @@ export default function ClientQuoteView({
       )}
 
       {/* ── CLIENT DECISION PANEL ── */}
-      <div className="sticky bottom-0 border-t-2 px-4 py-4 sm:px-6" style={{ borderColor: dark, background: '#fef9f0' }}>
+      <div className="sticky bottom-0 border-t-2 px-4 py-4 sm:px-6 print:hidden" style={{ borderColor: dark, background: '#fef9f0' }}>
         {!decision ? (
-          <div className="max-w-xl mx-auto flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={() => setDecision('accepted')}
-              className="flex-1 flex items-center justify-center gap-2 font-bold py-3.5 rounded-2xl text-sm transition-colors"
-              style={{ background: '#16a34a', color: 'white' }}
-            >
-              <CheckCircle2 size={16} /> Accept Quotation
-            </button>
-            <button
-              onClick={() => { setDecision('changes_requested'); setShowChanges(true) }}
-              className="flex-1 flex items-center justify-center gap-2 font-semibold py-3.5 rounded-2xl text-sm border-2 transition-colors"
-              style={{ borderColor: dark, color: dark, background: 'transparent' }}
-            >
-              <MessageSquare size={15} /> Request Changes
-            </button>
+          <div className="max-w-xl mx-auto space-y-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => setDecision('accepted')}
+                className="flex-1 flex items-center justify-center gap-2 font-bold py-3.5 rounded-2xl text-sm transition-colors"
+                style={{ background: '#16a34a', color: 'white' }}
+              >
+                <CheckCircle2 size={16} /> Accept Quotation
+              </button>
+              <button
+                onClick={() => setDecision('changes_requested')}
+                className="flex-1 flex items-center justify-center gap-2 font-semibold py-3.5 rounded-2xl text-sm border-2 transition-colors"
+                style={{ borderColor: dark, color: dark, background: 'transparent' }}
+              >
+                <MessageSquare size={15} /> Request Changes
+              </button>
+            </div>
+            <div className="flex justify-center">
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-xl border transition-colors"
+                style={{ borderColor: '#e8d5a3', color: '#a0875a', background: 'transparent' }}
+              >
+                <Download size={12} /> Download PDF
+              </button>
+            </div>
           </div>
         ) : decision === 'accepted' ? (
           <div className="max-w-xl mx-auto space-y-3">
@@ -312,12 +343,46 @@ export default function ClientQuoteView({
             </div>
           </div>
         ) : (
-          <div className="max-w-xl mx-auto space-y-3">
+          // changes_requested — per-item feedback + general note
+          <div className="max-w-2xl mx-auto space-y-3 max-h-[60vh] overflow-y-auto">
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#a0875a' }}>
+              Suggest changes per item (optional) + add a note below
+            </p>
+            {items.filter((r: any) => r.description?.trim()).map((r: any, idx: number) => {
+              const fb = itemFeedbacks[idx] || { suggestedAmount: '', comment: '' }
+              const amt = rowAmt(r)
+              return (
+                <div key={idx} className="rounded-xl border px-3 py-2.5 text-sm" style={{ borderColor: '#e8d5a3', background: '#fdf6e3' }}>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <p className="font-semibold text-sm" style={{ color: '#2d2d2d' }}>{r.description}</p>
+                    {amt > 0 && <p className="text-xs flex-shrink-0" style={{ color: '#a0875a' }}>₹{Math.round(amt).toLocaleString('en-IN')}</p>}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      value={fb.suggestedAmount}
+                      onChange={e => updateItemFeedback(idx, { suggestedAmount: e.target.value })}
+                      placeholder="Suggested amount (₹)"
+                      className="border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none"
+                      style={{ borderColor: '#e8d5a3', background: '#fef9f0', color: '#2d2d2d' }}
+                    />
+                    <input
+                      type="text"
+                      value={fb.comment}
+                      onChange={e => updateItemFeedback(idx, { comment: e.target.value })}
+                      placeholder="Comment (optional)"
+                      className="border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none"
+                      style={{ borderColor: '#e8d5a3', background: '#fef9f0', color: '#2d2d2d' }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
             <textarea
               value={note}
               onChange={e => setNote(e.target.value)}
               rows={3}
-              placeholder="Describe what changes you need (required)…"
+              placeholder="Overall feedback / changes needed (required)…"
               className="w-full border-2 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none"
               style={{ borderColor: '#e8d5a3', background: '#fef9f0', color: '#2d2d2d', fontFamily: 'inherit' }}
             />
@@ -327,7 +392,7 @@ export default function ClientQuoteView({
                 style={{ background: '#1a1a2e' }}>
                 {submitting ? 'Sending…' : 'Send Feedback'}
               </button>
-              <button onClick={() => { setDecision(null); setShowChanges(false) }}
+              <button onClick={() => setDecision(null)}
                 className="px-5 py-3 rounded-2xl text-sm font-medium border" style={{ borderColor: '#e8d5a3', color: '#6b5b45' }}>
                 Back
               </button>

@@ -58,6 +58,7 @@ Return ONLY a JSON array (no markdown, no explanation) with this exact structure
 ]
 
 Rules:
+- CRITICAL: The first row of any spreadsheet is a COLUMN HEADER — NEVER create an item from it. Skip any row where the description matches header words like "Sr. No", "S.No", "Description", "Element", "Item", "Specification", "Particulars", "Size", "Dimensions", "Rate", "Amount", "Qty", "Quantity", "Total", "Sr", "No."
 - Group related items under section headers
 - dim_str: use format like "20×10 ft", "15 rft", "2×2 ft" — or leave empty if not mentioned
 - days: setup + event days (default 1 if not mentioned)

@@ -78,210 +78,134 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
     }, {})
   ) as { id: string; name: string; category?: string }[] : []
 
+  const tabCls = 'text-sm bg-gray-900 border border-gray-800 hover:border-gray-600 hover:text-white text-gray-300 px-4 py-2 rounded-xl transition-colors'
+  const shortName = event.name?.length > 55 ? event.name.slice(0, 52) + '…' : event.name
+  const shortNotes = event.notes?.length > 120 ? event.notes.slice(0, 117) + '…' : event.notes
+
   return (
     <div className="max-w-4xl mx-auto">
-      {/* Event Header */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 mb-5">
-        <div className="flex items-start justify-between gap-4">
+
+      {/* ── EVENT HEADER ─────────────────────────────────────────── */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 mb-4">
+
+        {/* Top row: name + status + phase + actions */}
+        <div className="flex items-start justify-between gap-4 mb-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-2">
-              <h1 className="text-white text-xl font-bold">{event.name}</h1>
-              <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_COLORS[event.status as keyof typeof STATUS_COLORS]}`}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-white text-xl font-bold leading-tight" title={event.name}>{shortName}</h1>
+              <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[event.status as keyof typeof STATUS_COLORS]}`}>
                 {event.status}
               </span>
+              <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${currentPhase?.color}`}>
+                Phase {event.current_phase}: {currentPhase?.name}
+              </span>
             </div>
-            <div className="flex flex-wrap gap-3 text-sm text-gray-400">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-gray-400">
               {event.clients?.name && (
-                <span className="flex items-center gap-1"><Building2 size={13} /> {event.clients.name}</span>
-              )}
-              {event.venue && (
-                <span className="flex items-center gap-1"><MapPin size={13} /> {event.venue}{event.city ? `, ${event.city}` : ''}</span>
+                <span className="flex items-center gap-1"><Building2 size={12} /> {event.clients.name}</span>
               )}
               {event.event_date && (
                 <span className="flex items-center gap-1">
-                  <CalendarDays size={13} />
+                  <CalendarDays size={12} />
                   {new Date(event.event_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
                   {isDirector && (
-                    <EventDateEditor
-                      eventId={id}
-                      currentDate={event.event_date}
-                      eventName={event.name}
-                      hasTeam={(teamCount || 0) > 0}
-                      hasVendors={uniqueVendors.length > 0}
-                    />
+                    <EventDateEditor eventId={id} currentDate={event.event_date} eventName={event.name}
+                      hasTeam={(teamCount || 0) > 0} hasVendors={uniqueVendors.length > 0} />
                   )}
                 </span>
               )}
+              {event.venue && (
+                <span className="flex items-center gap-1"><MapPin size={12} /> {event.venue}{event.city ? `, ${event.city}` : ''}</span>
+              )}
               {event.poc?.name && (
                 <span className="flex items-center gap-1.5">
-                  <User size={13} />
-                  POC: {event.poc.name}
+                  <User size={12} /> POC: {event.poc.name}
                   {isDirector && (
-                    <EmergencyPOCReplace
-                      eventId={id}
-                      eventName={event.name}
-                      currentPOCName={event.poc.name}
-                      currentPOCId={event.poc_id}
-                      pocProfiles={(pocProfiles || []) as { id: string; name: string }[]}
-                    />
+                    <EmergencyPOCReplace eventId={id} eventName={event.name} currentPOCName={event.poc.name}
+                      currentPOCId={event.poc_id} pocProfiles={(pocProfiles || []) as { id: string; name: string }[]} />
                   )}
                 </span>
               )}
             </div>
           </div>
 
-          {/* Right side: phase tag + actions */}
           <div className="flex flex-col items-end gap-2 flex-shrink-0">
-            <span className={`text-sm px-3 py-1.5 rounded-full font-medium ${currentPhase?.color}`}>
-              {currentPhase?.name}
-            </span>
-            {isDirector && (
-              <EventStatusUpdate eventId={id} currentStatus={event.status} />
-            )}
-            {canRequestApproval && (
-              <RequestApprovalButton eventId={id} userId={user.id} />
-            )}
+            {isDirector && <EventStatusUpdate eventId={id} currentStatus={event.status} />}
+            {canRequestApproval && <RequestApprovalButton eventId={id} userId={user.id} />}
           </div>
         </div>
 
-        {/* Overall Progress */}
-        <div className="mt-4">
-          <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+        {/* Progress bar */}
+        <div>
+          <div className="flex justify-between text-xs text-gray-500 mb-1">
             <span>{doneTasks}/{totalTasks} tasks complete</span>
             <span>{overallProgress}%</span>
           </div>
-          <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-amber-500 rounded-full transition-all duration-500"
-              style={{ width: `${overallProgress}%` }}
-            />
+          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+            <div className="h-full bg-amber-500 rounded-full transition-all duration-500" style={{ width: `${overallProgress}%` }} />
           </div>
         </div>
 
-        {event.notes && (
-          <div className="mt-3 pt-3 border-t border-gray-800">
-            <p className="text-gray-500 text-xs">{event.notes}</p>
-          </div>
+        {/* Notes — truncated, only if present */}
+        {shortNotes && (
+          <p className="text-gray-600 text-xs mt-3 pt-3 border-t border-gray-800 leading-relaxed">{shortNotes}</p>
         )}
 
-        {/* Google Review Request — completed events only */}
-        {event.status === 'completed' && isDirector && (
-          <ReviewRequest
-            eventName={event.name}
-            clientName={event.clients?.contact_name || event.clients?.name}
-          />
-        )}
-
-        {/* Save as Template — director only */}
+        {/* Director tools — compact row */}
         {isDirector && (
-          <div className="mt-3 pt-3 border-t border-gray-800 flex justify-end">
+          <div className="mt-3 pt-3 border-t border-gray-800 flex flex-wrap gap-2 items-center">
             <SaveAsTemplate eventId={id} eventName={event.name} />
+            <BriefLinkGenerator eventId={id}
+              clientName={event.clients?.contact_name || event.clients?.name}
+              clientPhone={event.clients?.contact_phone}
+              clientEmail={event.clients?.contact_email}
+              eventType={event.type} eventDate={event.event_date} city={event.city} />
+            <PortalLinkGenerator eventId={id} clientId={event.client_id} vendors={uniqueVendors} />
           </div>
         )}
 
-        {/* Brief Link Generator — director only */}
-        {isDirector && (
-          <BriefLinkGenerator
-            eventId={id}
-            clientName={event.clients?.contact_name || event.clients?.name}
-            clientPhone={event.clients?.contact_phone}
-            clientEmail={event.clients?.contact_email}
-            eventType={event.type}
-            eventDate={event.event_date}
-            city={event.city}
-          />
-        )}
-
-        {/* Portal Link Generator — director only */}
-        {isDirector && (
-          <PortalLinkGenerator
-            eventId={id}
-            clientId={event.client_id}
-            vendors={uniqueVendors}
-          />
+        {event.status === 'completed' && isDirector && (
+          <ReviewRequest eventName={event.name} clientName={event.clients?.contact_name || event.clients?.name} />
         )}
       </div>
 
-      {/* Quick Links */}
-      <div className="flex gap-2 mb-4 flex-wrap">
-        <Link
-          href={`/dashboard/events/${id}/elements`}
-          className="text-sm bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-300 px-4 py-2 rounded-xl transition-colors"
-        >
-          Element Sheet
-        </Link>
-        <Link
-          href={`/dashboard/events/${id}/payments`}
-          className="text-sm bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-300 px-4 py-2 rounded-xl transition-colors"
-        >
-          Payments
-        </Link>
-        {(isDirector || profile.role === 'accounts') && (
-          <Link
-            href={`/dashboard/events/${id}/so`}
-            className="text-sm bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-300 px-4 py-2 rounded-xl transition-colors"
-          >
-            Vendor SO
-          </Link>
-        )}
+      {/* ── WORKFLOW TABS — in process order ─────────────────────── */}
+      <div className="flex gap-2 mb-5 flex-wrap">
+        {/* 1. Quotation — director only, first step */}
         {isDirector && (
-          <Link
-            href={`/dashboard/events/${id}/quotation`}
-            className="text-sm bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-300 px-4 py-2 rounded-xl transition-colors"
-          >
-            Quotation
-          </Link>
+          <Link href={`/dashboard/events/${id}/quotation`} className={tabCls}>Quotation</Link>
         )}
+        {/* 2. Element Sheet — all team */}
+        <Link href={`/dashboard/events/${id}/elements`} className={tabCls}>Elements</Link>
+        {/* 3. Vendor SO — director + accounts */}
         {(isDirector || profile.role === 'accounts') && (
-          <Link
-            href={`/dashboard/events/${id}/invoice`}
-            className="text-sm bg-gray-900 border border-amber-900/30 hover:border-amber-700/60 text-amber-400 px-4 py-2 rounded-xl transition-colors"
-          >
-            Invoice
-          </Link>
+          <Link href={`/dashboard/events/${id}/so`} className={tabCls}>Vendor SO</Link>
         )}
-        {(isDirector || profile.role === 'accounts') && (
-          <Link
-            href={`/dashboard/events/${id}/pnl`}
-            className="text-sm bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-300 px-4 py-2 rounded-xl transition-colors"
-          >
-            P&L
-          </Link>
+        {/* 4. Artwork — non-accounts */}
+        {profile.role !== 'accounts' && (
+          <Link href={`/dashboard/events/${id}/artwork`} className={tabCls}>Artwork</Link>
         )}
-        {isDirector && (
-          <Link
-            href={`/dashboard/events/${id}/contract`}
-            className="text-sm bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-300 px-4 py-2 rounded-xl transition-colors"
-          >
-            Agreement
-          </Link>
-        )}
-        {/* Team — director + admin */}
+        {/* 5. Team — director + admin */}
         {(isDirector || profile.role === 'admin') && (
-          <Link
-            href={`/dashboard/events/${id}/team`}
-            className="text-sm bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-300 px-4 py-2 rounded-xl transition-colors"
-          >
-            Team
-          </Link>
+          <Link href={`/dashboard/events/${id}/team`} className={tabCls}>Team</Link>
         )}
-        {/* Artwork — all except accounts */}
-        {profile.role !== 'accounts' && (
-          <Link
-            href={`/dashboard/events/${id}/artwork`}
-            className="text-sm bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-300 px-4 py-2 rounded-xl transition-colors"
-          >
-            Artwork
-          </Link>
+        {/* 6. Payments */}
+        <Link href={`/dashboard/events/${id}/payments`} className={tabCls}>Payments</Link>
+        {/* 7. Invoice — director + accounts */}
+        {(isDirector || profile.role === 'accounts') && (
+          <Link href={`/dashboard/events/${id}/invoice`} className={tabCls}>Invoice</Link>
         )}
-        {/* Media — all except accounts */}
+        {/* 8. P&L — director + accounts */}
+        {(isDirector || profile.role === 'accounts') && (
+          <Link href={`/dashboard/events/${id}/pnl`} className={tabCls}>P&amp;L</Link>
+        )}
+        {/* 9. Agreement — director */}
+        {isDirector && (
+          <Link href={`/dashboard/events/${id}/contract`} className={tabCls}>Agreement</Link>
+        )}
+        {/* 10. Media — non-accounts */}
         {profile.role !== 'accounts' && (
-          <Link
-            href={`/dashboard/events/${id}/media`}
-            className="text-sm bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-300 px-4 py-2 rounded-xl transition-colors"
-          >
-            Media
-          </Link>
+          <Link href={`/dashboard/events/${id}/media`} className={tabCls}>Media</Link>
         )}
       </div>
 

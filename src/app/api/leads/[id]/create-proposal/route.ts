@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { autoCompleteTasks, KEYWORDS_EVENT_CREATED } from '@/lib/autoCompleteTasks'
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -52,6 +53,12 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   // Auto-create all 30 tasks
   await supabase.rpc('create_event_tasks', { p_event_id: event.id })
+
+  // Auto-complete Phase 0 enquiry tasks — brief received, group created, team briefed
+  await autoCompleteTasks(
+    supabase, event.id, user.id, KEYWORDS_EVENT_CREATED,
+    'Auto-completed: Event created from client brief inquiry.'
+  )
 
   // Link lead to client and mark as proposal_sent
   await supabase.from('leads').update({

@@ -152,6 +152,13 @@ export default function PhotoBooth() {
     }
   }, [capturedUrl])
 
+  // Re-assign stream when countdown video element mounts
+  useEffect(() => {
+    if (stage === 'countdown' && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current
+    }
+  }, [stage])
+
   // Auto-reset countdown on result stage
   useEffect(() => {
     if (stage !== 'result') {
@@ -357,16 +364,6 @@ export default function PhotoBooth() {
   // ── ALL LIVE STAGES — canvas + video always mounted ────────────────────────
   return (
     <div className="h-screen w-screen bg-gray-950 select-none overflow-hidden relative">
-
-      {/* Camera — visible only during countdown */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className={stage === 'countdown' ? 'block' : 'hidden'}
-        style={{ transform: 'scaleX(-1)' }}
-      />
 
       {/* Canvas — always hidden, used for capture */}
       <canvas ref={canvasRef} className="hidden" />

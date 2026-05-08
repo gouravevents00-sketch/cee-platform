@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { autoCompleteTasks, KEYWORDS_QUOTATION_LOCKED, KEYWORDS_VENDOR_SO_SENT } from '@/lib/autoCompleteTasks'
 
 // ── POST /api/quotations/[id]/lock ────────────────────────────────
 // Director-only. Locks quotation and triggers full auto-generation:
@@ -203,7 +204,14 @@ export async function POST(
     })
   } catch { /* non-blocking */ }
 
-  // ── 9. Log activity ───────────────────────────────────────────
+  // ── 9. Auto-complete matching tasks ──────────────────────────
+  await autoCompleteTasks(
+    supabase, eventId, user.id,
+    [...KEYWORDS_QUOTATION_LOCKED, ...KEYWORDS_VENDOR_SO_SENT],
+    'Auto-completed: Quotation locked & event activated.'
+  )
+
+  // ── 10. Log activity ──────────────────────────────────────────
   try {
     await supabase.from('activity_log').insert({
       event_id: eventId,
