@@ -3,27 +3,15 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import NextImage from 'next/image'
-import { Camera, RefreshCw, Settings, Play, X, Sparkles } from 'lucide-react'
+import { Camera, RefreshCw, Settings, Play, X, Sparkles, Loader2 } from 'lucide-react'
 
 type Stage = 'setup' | 'idle' | 'countdown' | 'captured' | 'processing' | 'result' | 'error'
-type FilterId = 'neon' | 'royal' | 'magazine' | 'scifi' | 'warrior' | 'bollywood' | 'ghibli' | 'popstar'
 type EventType = 'corporate' | 'wedding' | 'party' | 'brand'
 
-interface Filter {
-  id: FilterId; label: string; emoji: string; description: string
-  borderColor: string; gradientFrom: string
-}
+interface DBFilter { id: string; name: string; emoji: string; description: string }
 
-const FILTERS: Filter[] = [
-  { id: 'bollywood', label: 'Bollywood',    emoji: '🎬', description: 'Bollywood movie star',       borderColor: 'border-rose-500',   gradientFrom: 'from-rose-900'   },
-  { id: 'neon',      label: 'Neon City',    emoji: '💜', description: 'Cyberpunk night scene',      borderColor: 'border-purple-500', gradientFrom: 'from-purple-900' },
-  { id: 'royal',     label: 'Royal',        emoji: '👑', description: 'Indian Maharaja palace',     borderColor: 'border-yellow-400', gradientFrom: 'from-yellow-900' },
-  { id: 'magazine',  label: 'Magazine',     emoji: '✨', description: 'Vogue cover shoot',          borderColor: 'border-zinc-300',   gradientFrom: 'from-zinc-700'   },
-  { id: 'scifi',     label: 'Sci-Fi Hero',  emoji: '🚀', description: 'Space station blockbuster',  borderColor: 'border-blue-400',   gradientFrom: 'from-blue-900'   },
-  { id: 'warrior',   label: 'Epic Warrior', emoji: '⚔️', description: 'Fantasy legend portrait',    borderColor: 'border-orange-400', gradientFrom: 'from-orange-900' },
-  { id: 'ghibli',    label: 'Ghibli',       emoji: '🌿', description: 'Studio Ghibli anime',        borderColor: 'border-green-400',  gradientFrom: 'from-green-900'  },
-  { id: 'popstar',   label: 'Pop Star',     emoji: '🎤', description: 'Arena concert stage',        borderColor: 'border-pink-400',   gradientFrom: 'from-pink-900'   },
-]
+const BORDER_CYCLE = ['border-rose-500','border-purple-500','border-yellow-400','border-zinc-300','border-blue-400','border-orange-400','border-green-400','border-pink-400']
+const GRAD_CYCLE   = ['from-rose-900','from-purple-900','from-yellow-900','from-zinc-700','from-blue-900','from-orange-900','from-green-900','from-pink-900']
 
 const COUNTDOWN_FROM  = 3
 const CAPTURE_SIZE    = 1024
@@ -35,23 +23,38 @@ export default function PhotoBooth() {
   const streamRef     = useRef<MediaStream | null>(null)
   const resetTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const [stage, setStage]                       = useState<Stage>('setup')
-  const [countdown, setCountdown]               = useState(COUNTDOWN_FROM)
-  const [capturedUrl, setCapturedUrl]           = useState<string | null>(null)
-  const [resultUrl, setResultUrl]               = useState<string | null>(null)
-  const [selectedFilter, setSelectedFilter]     = useState<FilterId>('bollywood')
-  const [progress, setProgress]                 = useState(0)
-  const [genTime, setGenTime]                   = useState(0)
-  const [errorMsg, setErrorMsg]                 = useState('')
-  const [resetTimer, setResetTimer]             = useState(AUTO_RESET_SECS)
+  const [stage, setStage]                   = useState<Stage>('setup')
+  const [countdown, setCountdown]           = useState(COUNTDOWN_FROM)
+  const [capturedUrl, setCapturedUrl]       = useState<string | null>(null)
+  const [resultUrl, setResultUrl]           = useState<string | null>(null)
+  const [filters, setFilters]               = useState<DBFilter[]>([])
+  const [selectedFilter, setSelectedFilter] = useState<DBFilter | null>(null)
+  const [filtersLoading, setFiltersLoading] = useState(true)
+  const [progress, setProgress]             = useState(0)
+  const [genTime, setGenTime]               = useState(0)
+  const [errorMsg, setErrorMsg]             = useState('')
+  const [resetTimer, setResetTimer]         = useState(AUTO_RESET_SECS)
 
-  const searchParams = useSearchParams()
-  const [eventName, setEventName]   = useState(() => searchParams.get('event') ?? '')
-  const [eventType, setEventType]   = useState<EventType>(() => (searchParams.get('type') as EventType) ?? 'corporate')
-  const [brandColor, setBrandColor] = useState('#f59e0b')
+  const searchParams  = useSearchParams()
+  const [eventName, setEventName]     = useState(() => searchParams.get('event') ?? '')
+  const [eventId]                     = useState(() => searchParams.get('event_id') ?? '')
+  const [eventType, setEventType]     = useState<EventType>(() => (searchParams.get('type') as EventType) ?? 'corporate')
+  const [brandColor, setBrandColor]   = useState('#f59e0b')
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null)
-  const [frameText, setFrameText]   = useState('')
-  const [brandTheme, setBrandTheme] = useState('')
+  const [frameText, setFrameText]     = useState('')
+  const [brandTheme, setBrandTheme]   = useState('')
+
+  // Load filters from DB
+  useEffect(() => {
+    fetch('/api/booth/filters')
+      .then(r => r.json())
+      .then(({ filters: f }) => {
+        setFilters(f ?? [])
+        if (f?.length) setSelectedFilter(f[0])
+      })
+      .catch(() => setFilters([]))
+      .finally(() => setFiltersLoading(false))
+  }, [])
 
   const startCamera = useCallback(async () => {
     try {
@@ -96,17 +99,22 @@ export default function PhotoBooth() {
       if (c <= 0) {
         clearInterval(iv)
         const url = captureFrame()
-        if (url) { setCapturedUrl(url); setSelectedFilter('bollywood'); setResultUrl(null); setStage('captured') }
+        if (url) {
+          setCapturedUrl(url)
+          setSelectedFilter(filters[0] ?? null)
+          setResultUrl(null)
+          setStage('captured')
+        }
       }
     }, 1000)
-  }, [captureFrame])
+  }, [captureFrame, filters])
 
   useEffect(() => {
     if (stage === 'countdown' && videoRef.current && streamRef.current)
       videoRef.current.srcObject = streamRef.current
   }, [stage])
 
-  const applyFilter = useCallback(async (filter: FilterId) => {
+  const applyFilter = useCallback(async (filter: DBFilter) => {
     if (!capturedUrl) return
     setStage('processing'); setProgress(0); setGenTime(0)
     const start = Date.now()
@@ -117,7 +125,11 @@ export default function PhotoBooth() {
     try {
       const res = await fetch('/api/booth/process', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_base64: capturedUrl.split(',')[1], filter, brand_context: brandTheme || undefined }),
+        body: JSON.stringify({
+          image_base64: capturedUrl.split(',')[1],
+          filter: filter.name,
+          brand_context: brandTheme || undefined,
+        }),
       })
       clearInterval(iv)
       if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Processing failed') }
@@ -135,8 +147,7 @@ export default function PhotoBooth() {
       if (resetTimerRef.current) clearInterval(resetTimerRef.current)
       setResetTimer(AUTO_RESET_SECS); return
     }
-    setResetTimer(AUTO_RESET_SECS)
-    let t = AUTO_RESET_SECS
+    setResetTimer(AUTO_RESET_SECS); let t = AUTO_RESET_SECS
     resetTimerRef.current = setInterval(() => {
       t -= 1; setResetTimer(t)
       if (t <= 0) { clearInterval(resetTimerRef.current!); reset() }
@@ -146,8 +157,9 @@ export default function PhotoBooth() {
 
   const reset = useCallback(() => {
     setCapturedUrl(null); setResultUrl(null); setErrorMsg('')
-    setProgress(0); setGenTime(0); setSelectedFilter('bollywood'); setStage('idle')
-  }, [])
+    setProgress(0); setGenTime(0)
+    setSelectedFilter(filters[0] ?? null); setStage('idle')
+  }, [filters])
 
   const exitBooth = useCallback(() => { stopCamera(); setStage('setup') }, [stopCamera])
 
@@ -157,8 +169,6 @@ export default function PhotoBooth() {
     reader.onload = ev => setLogoDataUrl(ev.target?.result as string)
     reader.readAsDataURL(file)
   }, [])
-
-  const filterLabel = FILTERS.find(f => f.id === selectedFilter)?.label ?? ''
 
   // ── SETUP ──────────────────────────────────────────────────────────────────
   if (stage === 'setup') return (
@@ -223,10 +233,20 @@ export default function PhotoBooth() {
             </div>
           </div>
         </div>
-        <button onClick={launchBooth}
-          className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 active:scale-95 text-black font-bold py-4 rounded-2xl text-base transition-all shadow-lg shadow-amber-500/20">
-          <Play size={18} /> Launch Booth
-        </button>
+        {filtersLoading ? (
+          <div className="flex items-center justify-center gap-2 py-3 text-gray-500 text-sm">
+            <Loader2 size={14} className="animate-spin" /> Loading styles...
+          </div>
+        ) : filters.length === 0 ? (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 text-amber-400 text-xs text-center">
+            No active styles found. Add styles in Dashboard → Experiences → Photo Booth → Manage Styles.
+          </div>
+        ) : (
+          <button onClick={launchBooth}
+            className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 active:scale-95 text-black font-bold py-4 rounded-2xl text-base transition-all shadow-lg shadow-amber-500/20">
+            <Play size={18} /> Launch Booth ({filters.length} styles ready)
+          </button>
+        )}
       </div>
     </div>
   )
@@ -279,27 +299,33 @@ export default function PhotoBooth() {
           </div>
           <div className="text-center">
             <p className="text-white text-base font-semibold">Choose your transformation</p>
-            <p className="text-gray-600 text-xs mt-0.5">AI places you in a new scene — your face stays exactly as is</p>
+            <p className="text-gray-600 text-xs mt-0.5">AI places you in a new scene — face stays exactly yours</p>
           </div>
           <div className="grid grid-cols-4 gap-2 w-full max-w-xs">
-            {FILTERS.map(f => (
-              <button key={f.id} onClick={() => setSelectedFilter(f.id)}
-                className={`flex flex-col items-center gap-1 px-1 py-3 rounded-2xl border-2 transition-all ${selectedFilter === f.id ? `${f.borderColor} bg-gradient-to-b ${f.gradientFrom} to-transparent` : 'border-gray-800 bg-gray-900/50'}`}>
+            {filters.map((f, i) => (
+              <button key={f.id} onClick={() => setSelectedFilter(f)}
+                className={`flex flex-col items-center gap-1 px-1 py-3 rounded-2xl border-2 transition-all ${
+                  selectedFilter?.id === f.id
+                    ? `${BORDER_CYCLE[i % BORDER_CYCLE.length]} bg-gradient-to-b ${GRAD_CYCLE[i % GRAD_CYCLE.length]} to-transparent`
+                    : 'border-gray-800 bg-gray-900/50'
+                }`}>
                 <span className="text-xl">{f.emoji}</span>
-                <span className={`text-[10px] font-semibold leading-tight text-center ${selectedFilter === f.id ? 'text-white' : 'text-gray-500'}`}>{f.label}</span>
+                <span className={`text-[10px] font-semibold leading-tight text-center ${selectedFilter?.id === f.id ? 'text-white' : 'text-gray-500'}`}>{f.name}</span>
               </button>
             ))}
           </div>
-          <p className="text-amber-500/70 text-xs text-center max-w-xs">
-            <Sparkles size={10} className="inline mr-1" />
-            {FILTERS.find(f => f.id === selectedFilter)?.description}
-            {brandTheme && ` · ${brandTheme} themed`}
-          </p>
+          {selectedFilter && (
+            <p className="text-amber-500/70 text-xs text-center max-w-xs">
+              <Sparkles size={10} className="inline mr-1" />
+              {selectedFilter.description}
+              {brandTheme && ` · ${brandTheme} themed`}
+            </p>
+          )}
           <div className="flex gap-3">
             <button onClick={reset} className="bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium px-6 py-3 rounded-xl text-sm transition-colors">Retake</button>
-            <button onClick={() => applyFilter(selectedFilter)}
-              className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 active:scale-95 text-black font-bold px-8 py-3 rounded-xl transition-all shadow-lg shadow-amber-500/20">
-              <Sparkles size={16} /> Apply {filterLabel}
+            <button onClick={() => selectedFilter && applyFilter(selectedFilter)} disabled={!selectedFilter}
+              className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 active:scale-95 text-black font-bold px-8 py-3 rounded-xl transition-all shadow-lg shadow-amber-500/20">
+              <Sparkles size={16} /> Apply {selectedFilter?.name}
             </button>
           </div>
         </div>
@@ -309,7 +335,7 @@ export default function PhotoBooth() {
         <div className="h-full flex flex-col items-center justify-center gap-8 px-6">
           <div className="text-center">
             <div className="text-7xl mb-4" style={{ animation: 'spin 3s linear infinite' }}>✨</div>
-            <p className="text-white text-xl font-bold">Creating your {filterLabel}...</p>
+            <p className="text-white text-xl font-bold">Creating your {selectedFilter?.name}...</p>
             <p className="text-gray-500 text-sm mt-1">Building your scene · face preserved · {genTime}s</p>
             {brandTheme && <p className="text-amber-500/60 text-xs mt-1">Weaving in {brandTheme}</p>}
           </div>
@@ -324,7 +350,7 @@ export default function PhotoBooth() {
 
       {stage === 'result' && resultUrl && (() => {
         const origin   = typeof window !== 'undefined' ? window.location.origin : 'https://cee-platform-eight.vercel.app'
-        const claimUrl = `${origin}/booth/claim?url=${encodeURIComponent(resultUrl)}&event=${encodeURIComponent(eventName)}&filter=${encodeURIComponent(selectedFilter)}&color=${encodeURIComponent(brandColor)}&text=${encodeURIComponent(frameText)}`
+        const claimUrl = `${origin}/booth/claim?url=${encodeURIComponent(resultUrl)}&event=${encodeURIComponent(eventName)}&event_id=${encodeURIComponent(eventId)}&filter=${encodeURIComponent(selectedFilter?.name ?? '')}&color=${encodeURIComponent(brandColor)}&text=${encodeURIComponent(frameText)}`
         const qrSrc    = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&color=000000&bgcolor=ffffff&data=${encodeURIComponent(claimUrl)}`
         return (
           <div className="h-full flex flex-col items-center justify-center gap-5 px-4">
@@ -345,7 +371,7 @@ export default function PhotoBooth() {
                 </>
               )}
               <div className="flex flex-col items-center gap-1.5">
-                <p className="text-amber-400 text-xs uppercase tracking-wider font-medium">{filterLabel}</p>
+                <p className="text-amber-400 text-xs uppercase tracking-wider font-medium">{selectedFilter?.name}</p>
                 <div className="w-44 h-44 rounded-2xl overflow-hidden border-2 border-amber-500/40 shadow-xl relative">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={resultUrl} alt="Result" className="w-full h-full object-cover blur-md scale-105" />
