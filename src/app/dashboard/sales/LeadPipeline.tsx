@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Trash2, Phone, Mail, IndianRupee, Calendar, ChevronDown, ArrowRight, Trophy } from 'lucide-react'
+import { Plus, Trash2, Phone, Mail, IndianRupee, Calendar, ChevronDown, ArrowRight, Trophy, FileText, Loader2 } from 'lucide-react'
 import LeadInteractions from './LeadInteractions'
 
 const STATUSES = [
@@ -45,7 +45,20 @@ export default function LeadPipeline({ leads, profiles, clients, userId, isDirec
   const [loading, setLoading] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [creatingProposalId, setCreatingProposalId] = useState<string | null>(null)
   const router = useRouter()
+
+  async function createProposal(leadId: string) {
+    setCreatingProposalId(leadId)
+    const res = await fetch(`/api/leads/${leadId}/create-proposal`, { method: 'POST' })
+    const data = await res.json()
+    if (data.event_id) {
+      router.push(`/dashboard/events/${data.event_id}/quotation`)
+    } else {
+      alert(data.error || 'Failed to create proposal')
+      setCreatingProposalId(null)
+    }
+  }
 
   const displayed = items.filter(l => {
     if (filter === 'active') return !['closed_won', 'closed_lost'].includes(l.status)
@@ -215,6 +228,19 @@ export default function LeadPipeline({ leads, profiles, clients, userId, isDirec
 
                   {lead.notes && (
                     <p className="text-gray-400 text-sm">{lead.notes}</p>
+                  )}
+
+                  {/* Create Proposal */}
+                  {!['closed_won', 'closed_lost'].includes(lead.status) && (
+                    <button
+                      onClick={() => createProposal(lead.id)}
+                      disabled={creatingProposalId === lead.id}
+                      className="w-full flex items-center justify-center gap-2 text-sm bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-black font-semibold px-4 py-2.5 rounded-xl transition-colors"
+                    >
+                      {creatingProposalId === lead.id
+                        ? <><Loader2 size={14} className="animate-spin" /> Creating…</>
+                        : <><FileText size={14} /> Create Proposal</>}
+                    </button>
                   )}
 
                   {/* Move forward / close actions */}
