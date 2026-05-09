@@ -2,26 +2,25 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Camera, RefreshCw, Loader2 } from 'lucide-react'
+import { Camera, RefreshCw, Loader2, Zap } from 'lucide-react'
 
-type Stage = 'loading' | 'attract' | 'countdown' | 'processing' | 'uploading' | 'result' | 'error' | 'no-config'
+type Stage = 'loading' | 'attract' | 'countdown' | 'ai' | 'framing' | 'uploading' | 'result' | 'error' | 'no-config'
 
 interface BrandConfig {
   id: string
-  name: string
   brand_name: string
   tagline: string
   primary_color: string
   secondary_color: string
   logo_data_url: string | null
   frame_style: 'strip' | 'polaroid' | 'corner'
+  scene_prompt: string | null
 }
 
 const COUNTDOWN_FROM = 3
-const CAPTURE_SIZE = 1080
+const CAPTURE_SIZE = 1024
 const AUTO_RESET_SECS = 30
 
-// --- Canvas frame renderer ---
 function loadImg(src: string): Promise<HTMLImageElement> {
   return new Promise((res, rej) => {
     const img = new Image()
@@ -32,15 +31,13 @@ function loadImg(src: string): Promise<HTMLImageElement> {
   })
 }
 
-async function renderFrame(photoDataUrl: string, cfg: BrandConfig): Promise<string> {
-  const W = 1080
-  const PHOTO_H = 1080
-  const STRIP_H = 270
-  const TOTAL_H = PHOTO_H + STRIP_H
-
+// Apply brand frame overlay on top of the AI-generated photo (fetched from URL)
+async function applyBrandFrame(aiImageUrl: string, cfg: BrandConfig): Promise<string> {
+  const W = 1080, PHOTO_H = 1080, STRIP_H = 270
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')!
-  const photo = await loadImg(photoDataUrl)
+
+  const photo = await loadImg(aiImageUrl)
   const logo = cfg.logo_data_url ? await loadImg(cfg.logo_data_url) : null
 
   const drawText = (text: string, x: number, y: number, size: number, bold = false, alpha = 1) => {
@@ -49,94 +46,69 @@ async function renderFrame(photoDataUrl: string, cfg: BrandConfig): Promise<stri
     ctx.font = `${bold ? 'bold ' : ''}${size}px -apple-system, BlinkMacSystemFont, sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(text, x, y)
+    // Truncate long text
+    const maxW = 400
+    ctx.fillText(text.length > 30 ? text.slice(0, 30) + '…' : text, x, y, maxW)
     ctx.globalAlpha = 1
   }
 
-  if (cfg.frame_style === 'polaroid') {
-    // White background polaroid
-    const PAD_SIDE = 32
-    const PAD_TOP = 32
-    const PAD_BOTTOM = STRIP_H + PAD_TOP
+  if (cfg.frame_style === 'corner') {
+    canvas.width = W; canvas.height = PHOTO_H
+    ctx.drawImage(photo, 0, 0, W, PHOTO_H)
+    // Slim gradient bar
+    const grad = ctx.createLinearGradient(0, PHOTO_H - 120, 0, PHOTO_H)
+    grad.addColorStop(0, 'transparent')
+    grad.addColorStop(1, cfg.primary_color + 'ee')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, PHOTO_H - 120, W, 120)
+    if (logo) {
+      const lh = 55, lw = Math.min((logo.width / logo.height) * lh, 120)
+      ctx.drawImage(logo, W - lw - 20, 20, lw, lh)
+    }
+    drawText(cfg.brand_name, W / 2, PHOTO_H - 55, 38, true)
+    if (cfg.tagline) drawText(cfg.tagline, W / 2, PHOTO_H - 22, 24, false, 0.75)
 
-    canvas.width = W
-    canvas.height = TOTAL_H
-
-    // White mat
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, W, TOTAL_H)
-
-    // Photo with shadow
-    ctx.shadowColor = 'rgba(0,0,0,0.15)'
-    ctx.shadowBlur = 20
-    ctx.drawImage(photo, PAD_SIDE, PAD_TOP, W - PAD_SIDE * 2, PHOTO_H - PAD_TOP)
+  } else if (cfg.frame_style === 'polaroid') {
+    canvas.width = W; canvas.height = W + STRIP_H
+    ctx.fillStyle = '#f5f5f5'; ctx.fillRect(0, 0, W, W + STRIP_H)
+    // Shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.12)'; ctx.shadowBlur = 24
+    ctx.drawImage(photo, 28, 28, W - 56, PHOTO_H - 28)
     ctx.shadowBlur = 0
-
-    // Brand strip at bottom
-    ctx.fillStyle = cfg.primary_color
-    ctx.fillRect(0, PHOTO_H, W, STRIP_H)
-
-    // Logo in strip
+    // Brand strip
+    ctx.fillStyle = cfg.primary_color; ctx.fillRect(0, PHOTO_H, W, STRIP_H)
     if (logo) {
       const lh = 100, lw = Math.min((logo.width / logo.height) * lh, 200)
-      ctx.drawImage(logo, 60, PHOTO_H + (STRIP_H - lh) / 2, lw, lh)
+      ctx.drawImage(logo, 52, PHOTO_H + (STRIP_H - lh) / 2, lw, lh)
     }
-
-    // Brand name
-    const textX = logo ? W * 0.62 : W / 2
-    drawText(cfg.brand_name, textX, PHOTO_H + STRIP_H / 2 - (cfg.tagline ? 18 : 0), 52, true)
-    if (cfg.tagline) drawText(cfg.tagline, textX, PHOTO_H + STRIP_H / 2 + 38, 30, false, 0.75)
-
-    // Bottom white with hashtag hint
-    ctx.fillStyle = '#f8f8f8'
-    ctx.fillRect(0, TOTAL_H - PAD_BOTTOM + PAD_TOP, W, PAD_BOTTOM - PAD_TOP)
-
-  } else if (cfg.frame_style === 'corner') {
-    // Photo with corner logo badges only
-    canvas.width = W
-    canvas.height = PHOTO_H
-
-    ctx.drawImage(photo, 0, 0, W, PHOTO_H)
-
-    // Semi-transparent brand bar at bottom (slim)
-    ctx.fillStyle = cfg.primary_color
-    ctx.globalAlpha = 0.85
-    ctx.fillRect(0, PHOTO_H - 100, W, 100)
-    ctx.globalAlpha = 1
-
-    if (logo) {
-      // Corner logos: top-right + bottom-left
-      const lh = 70, lw = Math.min((logo.width / logo.height) * lh, 150)
-      ctx.drawImage(logo, W - lw - 24, 24, lw, lh)
-    }
-
-    drawText(cfg.brand_name, W / 2, PHOTO_H - 50, 38, true)
-    if (cfg.tagline) drawText(cfg.tagline, W / 2, PHOTO_H - 20, 24, false, 0.8)
+    const tx = logo ? W * 0.62 : W / 2
+    drawText(cfg.brand_name, tx, PHOTO_H + STRIP_H / 2 - (cfg.tagline ? 22 : 0), 52, true)
+    if (cfg.tagline) drawText(cfg.tagline, tx, PHOTO_H + STRIP_H / 2 + 40, 30, false, 0.72)
 
   } else {
-    // Default: strip
-    canvas.width = W
-    canvas.height = TOTAL_H
-
+    // strip (default)
+    canvas.width = W; canvas.height = W + STRIP_H
     ctx.drawImage(photo, 0, 0, W, PHOTO_H)
-
-    // Brand strip
-    ctx.fillStyle = cfg.primary_color
-    ctx.fillRect(0, PHOTO_H, W, STRIP_H)
-
-    // Logo
+    ctx.fillStyle = cfg.primary_color; ctx.fillRect(0, PHOTO_H, W, STRIP_H)
     if (logo) {
       const lh = 120, lw = Math.min((logo.width / logo.height) * lh, 220)
       ctx.drawImage(logo, 50, PHOTO_H + (STRIP_H - lh) / 2, lw, lh)
     }
-
-    // Text
-    const textX = logo ? W * 0.62 : W / 2
-    drawText(cfg.brand_name, textX, PHOTO_H + STRIP_H / 2 - (cfg.tagline ? 20 : 0), 56, true)
-    if (cfg.tagline) drawText(cfg.tagline, textX, PHOTO_H + STRIP_H / 2 + 42, 32, false, 0.72)
+    const tx = logo ? W * 0.62 : W / 2
+    drawText(cfg.brand_name, tx, PHOTO_H + STRIP_H / 2 - (cfg.tagline ? 22 : 0), 56, true)
+    if (cfg.tagline) drawText(cfg.tagline, tx, PHOTO_H + STRIP_H / 2 + 42, 32, false, 0.72)
   }
 
-  return canvas.toDataURL('image/jpeg', 0.92)
+  return canvas.toDataURL('image/jpeg', 0.93)
+}
+
+function adjustColor(hex: string, amount: number): string {
+  const c = hex.replace('#', '')
+  if (c.length !== 6) return hex
+  const r = Math.max(0, Math.min(255, parseInt(c.slice(0, 2), 16) + amount))
+  const g = Math.max(0, Math.min(255, parseInt(c.slice(2, 4), 16) + amount))
+  const b = Math.max(0, Math.min(255, parseInt(c.slice(4, 6), 16) + amount))
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
 }
 
 export default function BrandStation() {
@@ -145,18 +117,18 @@ export default function BrandStation() {
   const streamRef  = useRef<MediaStream | null>(null)
   const resetRef   = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const [stage, setStage]         = useState<Stage>('loading')
-  const [config, setConfig]       = useState<BrandConfig | null>(null)
-  const [countdown, setCountdown] = useState(COUNTDOWN_FROM)
-  const [resultUrl, setResultUrl] = useState<string | null>(null)
-  const [photoUrl, setPhotoUrl]   = useState<string | null>(null)
+  const [stage, setStage]           = useState<Stage>('loading')
+  const [config, setConfig]         = useState<BrandConfig | null>(null)
+  const [countdown, setCountdown]   = useState(COUNTDOWN_FROM)
+  const [resultUrl, setResultUrl]   = useState<string | null>(null)
+  const [photoUrl, setPhotoUrl]     = useState<string | null>(null)
   const [resetTimer, setResetTimer] = useState(AUTO_RESET_SECS)
-  const [errorMsg, setErrorMsg]   = useState('')
+  const [errorMsg, setErrorMsg]     = useState('')
+  const [aiProgress, setAiProgress] = useState(0)
 
   const searchParams = useSearchParams()
   const configId = searchParams.get('config')
 
-  // Load brand config
   useEffect(() => {
     if (!configId) { setStage('no-config'); return }
     fetch(`/api/brand-activation/configs/${configId}`)
@@ -169,7 +141,6 @@ export default function BrandStation() {
       .catch(() => setStage('no-config'))
   }, [configId])
 
-  // Start camera
   const startCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -177,17 +148,12 @@ export default function BrandStation() {
         audio: false,
       })
       streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play()
-      }
     } catch {
-      setErrorMsg('Camera not accessible. Please allow camera permission.')
+      setErrorMsg('Camera not accessible. Please allow camera permission and try again.')
       setStage('error')
     }
   }, [])
 
-  // Attach stream to video when countdown stage renders
   useEffect(() => {
     if (stage !== 'countdown') return
     if (streamRef.current && videoRef.current) {
@@ -196,13 +162,12 @@ export default function BrandStation() {
     }
   }, [stage])
 
-  // Stop camera
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach(t => t.stop())
     streamRef.current = null
   }, [])
 
-  // Auto-reset timer in result stage
+  // Auto-reset countdown in result stage
   useEffect(() => {
     if (stage !== 'result') return
     setResetTimer(AUTO_RESET_SECS)
@@ -220,24 +185,19 @@ export default function BrandStation() {
   function resetToAttract() {
     if (resetRef.current) clearInterval(resetRef.current)
     stopCamera()
-    setResultUrl(null)
-    setPhotoUrl(null)
-    setErrorMsg('')
-    setCountdown(COUNTDOWN_FROM)
+    setResultUrl(null); setPhotoUrl(null); setErrorMsg('')
+    setCountdown(COUNTDOWN_FROM); setAiProgress(0)
     setStage('attract')
   }
 
   async function handleStart() {
     await startCamera()
-    setStage('countdown')
+    if (streamRef.current) setStage('countdown')
     let n = COUNTDOWN_FROM
     const t = setInterval(async () => {
       n--
       setCountdown(n)
-      if (n <= 0) {
-        clearInterval(t)
-        await captureAndProcess()
-      }
+      if (n <= 0) { clearInterval(t); await captureAndProcess() }
     }, 1000)
   }
 
@@ -246,46 +206,64 @@ export default function BrandStation() {
     const video  = videoRef.current
     if (!canvas || !video || !config) return
 
-    // Capture square crop from video (mirrored)
     canvas.width = canvas.height = CAPTURE_SIZE
     const ctx = canvas.getContext('2d')!
     const vw = video.videoWidth, vh = video.videoHeight
     const size = Math.min(vw, vh)
     const sx = (vw - size) / 2, sy = (vh - size) / 2
-    ctx.translate(CAPTURE_SIZE, 0)
-    ctx.scale(-1, 1)
+    ctx.translate(CAPTURE_SIZE, 0); ctx.scale(-1, 1)
     ctx.drawImage(video, sx, sy, size, size, 0, 0, CAPTURE_SIZE, CAPTURE_SIZE)
     ctx.setTransform(1, 0, 0, 1, 0, 0)
 
-    const photoDataUrl = canvas.toDataURL('image/jpeg', 0.92)
+    const photoBase64 = canvas.toDataURL('image/jpeg', 0.92).split(',')[1]
     stopCamera()
-    setStage('processing')
+
+    // Step 1: AI scene generation
+    setStage('ai')
+    setAiProgress(0)
+    const progressInterval = setInterval(() => {
+      setAiProgress(p => Math.min(p + 3, 90))
+    }, 400)
 
     try {
-      // Apply brand frame
-      const framedDataUrl = await renderFrame(photoDataUrl, config)
-      setResultUrl(framedDataUrl) // preview locally
+      const aiRes = await fetch('/api/brand-activation/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_base64: photoBase64, config_id: config.id }),
+      })
+      const { ai_url, error: aiErr } = await aiRes.json()
+      clearInterval(progressInterval)
+      setAiProgress(100)
 
+      if (aiErr || !ai_url) throw new Error(aiErr ?? 'AI processing failed')
+
+      // Step 2: Apply brand frame overlay on AI result
+      setStage('framing')
+      const framedDataUrl = await applyBrandFrame(ai_url, config)
+      setResultUrl(framedDataUrl)
+
+      // Step 3: Upload final framed photo
       setStage('uploading')
-
-      // Upload to storage
       const base64 = framedDataUrl.split(',')[1]
-      const res = await fetch('/api/brand-activation/upload', {
+      const upRes = await fetch('/api/brand-activation/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image_base64: base64, config_id: config.id }),
       })
-      const { photo_url, error } = await res.json()
-      if (error || !photo_url) throw new Error(error ?? 'Upload failed')
+      const { photo_url, error: upErr } = await upRes.json()
+      if (upErr || !photo_url) throw new Error(upErr ?? 'Upload failed')
+
       setPhotoUrl(photo_url)
       setStage('result')
     } catch (err) {
+      clearInterval(progressInterval)
       setErrorMsg(err instanceof Error ? err.message : 'Something went wrong')
       setStage('error')
     }
   }
 
-  // --- Render ---
+  // --- SCREENS ---
+
   if (stage === 'loading') {
     return (
       <div className="fixed inset-0 bg-gray-950 flex items-center justify-center">
@@ -299,10 +277,8 @@ export default function BrandStation() {
       <div className="fixed inset-0 bg-gray-950 flex flex-col items-center justify-center gap-4 p-8 text-center">
         <Camera size={48} className="text-gray-600" />
         <p className="text-white text-xl font-bold">No Brand Config Found</p>
-        <p className="text-gray-500 text-sm max-w-sm">
-          Launch this station from the CEE Platform dashboard with a valid config ID.
-        </p>
-        <p className="text-gray-600 text-xs font-mono">/brand-station?config=&lt;uuid&gt;</p>
+        <p className="text-gray-500 text-sm max-w-xs">Launch this station from the CEE Platform operator panel with a valid config ID.</p>
+        <p className="text-gray-700 text-xs font-mono">/brand-station?config=uuid</p>
       </div>
     )
   }
@@ -311,11 +287,11 @@ export default function BrandStation() {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center gap-6 p-8 text-center"
         style={{ background: config?.primary_color ?? '#0f172a' }}>
-        <p className="text-white text-xl font-bold">Oops!</p>
-        <p className="text-white/70 text-sm max-w-sm">{errorMsg}</p>
+        <p className="text-white text-2xl font-bold">Oops, something went wrong</p>
+        <p className="text-white/60 text-sm max-w-sm">{errorMsg}</p>
         <button onClick={resetToAttract}
-          className="flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-medium transition-colors">
-          <RefreshCw size={16} /> Try Again
+          className="flex items-center gap-2 px-8 py-4 bg-white/15 hover:bg-white/25 text-white rounded-2xl font-bold transition-colors">
+          <RefreshCw size={18} /> Try Again
         </button>
       </div>
     )
@@ -325,48 +301,41 @@ export default function BrandStation() {
     const bg = config.primary_color
     const fg = config.secondary_color
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center select-none overflow-hidden"
-        style={{ background: `linear-gradient(135deg, ${bg} 0%, ${adjustColor(bg, -30)} 100%)` }}>
-        {/* Animated rings */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="absolute rounded-full border"
-              style={{
-                width: `${i * 240}px`, height: `${i * 240}px`,
-                borderColor: fg, opacity: 0.08 - i * 0.02,
-                animation: `ping ${2 + i * 0.5}s cubic-bezier(0,0,0.2,1) infinite`,
-                animationDelay: `${i * 0.4}s`,
-              }} />
-          ))}
-        </div>
+      <div className="fixed inset-0 flex flex-col items-center justify-center select-none overflow-hidden cursor-pointer"
+        style={{ background: `linear-gradient(145deg, ${bg} 0%, ${adjustColor(bg, -40)} 100%)` }}
+        onClick={handleStart}>
+        {/* Ambient rings */}
+        {[280, 480, 680].map((s, i) => (
+          <div key={i} className="absolute rounded-full border pointer-events-none"
+            style={{ width: s, height: s, borderColor: fg, opacity: 0.06,
+              animation: `ping ${2.5 + i * 0.6}s cubic-bezier(0,0,0.2,1) infinite`,
+              animationDelay: `${i * 0.5}s` }} />
+        ))}
 
-        {/* Logo */}
         {config.logo_data_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={config.logo_data_url} alt={config.brand_name}
-            className="w-48 h-32 object-contain mb-8 drop-shadow-2xl" />
+            className="w-52 h-36 object-contain mb-8 drop-shadow-2xl" />
         )}
 
-        {/* Brand name */}
-        <h1 className="text-6xl font-black tracking-tight mb-3 drop-shadow-lg text-center px-8"
+        <h1 className="text-7xl font-black text-center px-8 leading-none mb-4 drop-shadow-xl"
           style={{ color: fg }}>
           {config.brand_name}
         </h1>
+
         {config.tagline && (
-          <p className="text-xl mb-16 tracking-wide text-center px-8"
-            style={{ color: fg, opacity: 0.7 }}>
+          <p className="text-2xl text-center px-8 mb-14 tracking-wide" style={{ color: fg, opacity: 0.65 }}>
             {config.tagline}
           </p>
         )}
 
-        {/* CTA button */}
-        <button onClick={handleStart}
-          className="relative px-16 py-6 rounded-3xl text-2xl font-black transition-all active:scale-95 shadow-2xl"
+        <div className="flex items-center gap-3 px-12 py-6 rounded-3xl text-2xl font-black shadow-2xl transition-transform active:scale-95"
           style={{ background: fg, color: bg }}>
-          <span className="relative z-10">📸 Tap to Take Photo</span>
-        </button>
+          <Camera size={28} />
+          Tap to Take Your Photo
+        </div>
 
-        <p className="mt-8 text-sm tracking-widest uppercase" style={{ color: fg, opacity: 0.4 }}>
+        <p className="absolute bottom-6 text-xs tracking-widest uppercase" style={{ color: fg, opacity: 0.3 }}>
           Powered by Creative Era Experiences
         </p>
       </div>
@@ -381,29 +350,19 @@ export default function BrandStation() {
         <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover"
           style={{ transform: 'scaleX(-1)' }} muted playsInline autoPlay />
         <canvas ref={canvasRef} className="hidden" />
-
-        {/* Countdown overlay */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30">
-          {countdown > 0 ? (
-            <>
-              <div className="text-[200px] font-black leading-none drop-shadow-2xl" style={{ color: fg }}>
-                {countdown}
-              </div>
-              <p className="text-2xl font-medium mt-4" style={{ color: fg, opacity: 0.8 }}>
-                Smile! ☺
-              </p>
-            </>
-          ) : (
-            <div className="text-6xl font-black" style={{ color: fg }}>✨</div>
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/25">
+          <div className="text-[220px] font-black leading-none drop-shadow-2xl" style={{ color: fg }}>
+            {countdown > 0 ? countdown : '✨'}
+          </div>
+          {countdown > 0 && (
+            <p className="text-3xl font-medium mt-2" style={{ color: fg, opacity: 0.8 }}>Smile! ☺</p>
           )}
         </div>
-
-        {/* Brand corner badge */}
-        <div className="absolute top-6 right-6 flex items-center gap-3 px-4 py-2 rounded-2xl"
-          style={{ background: bg + 'dd' }}>
+        <div className="absolute top-6 right-6 flex items-center gap-3 px-5 py-2.5 rounded-2xl"
+          style={{ background: bg + 'ee' }}>
           {config.logo_data_url && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={config.logo_data_url} alt="" className="h-8 w-auto object-contain" />
+            <img src={config.logo_data_url} alt="" className="h-9 w-auto object-contain" />
           )}
           <span className="text-sm font-bold" style={{ color: fg }}>{config.brand_name}</span>
         </div>
@@ -411,84 +370,98 @@ export default function BrandStation() {
     )
   }
 
-  if ((stage === 'processing' || stage === 'uploading') && config) {
+  if ((stage === 'ai' || stage === 'framing' || stage === 'uploading') && config) {
     const fg = config.secondary_color
+    const bg = config.primary_color
+    const msgs: Record<string, string> = {
+      ai: 'Creating your branded scene…',
+      framing: 'Adding brand identity…',
+      uploading: 'Finishing up…',
+    }
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center gap-6"
-        style={{ background: `linear-gradient(135deg, ${config.primary_color} 0%, ${adjustColor(config.primary_color, -30)} 100%)` }}>
-        <Loader2 size={64} className="animate-spin" style={{ color: fg }} />
-        <p className="text-2xl font-bold" style={{ color: fg }}>
-          {stage === 'processing' ? 'Applying your brand frame...' : 'Almost done...'}
-        </p>
+      <div className="fixed inset-0 flex flex-col items-center justify-center gap-8"
+        style={{ background: `linear-gradient(145deg, ${bg} 0%, ${adjustColor(bg, -40)} 100%)` }}>
         {config.logo_data_url && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={config.logo_data_url} alt={config.brand_name}
-            className="w-24 h-16 object-contain opacity-60" />
+          <img src={config.logo_data_url} alt="" className="w-28 h-20 object-contain opacity-70" />
+        )}
+
+        <div className="flex flex-col items-center gap-4">
+          <Zap size={56} className="animate-pulse" style={{ color: fg }} />
+          <p className="text-2xl font-bold text-center px-8" style={{ color: fg }}>
+            {msgs[stage]}
+          </p>
+          {stage === 'ai' && (
+            <p className="text-base opacity-60 text-center" style={{ color: fg }}>
+              AI is placing you in the {config.brand_name} scene — ~10 seconds
+            </p>
+          )}
+        </div>
+
+        {/* Progress bar */}
+        {stage === 'ai' && (
+          <div className="w-72 h-2 rounded-full overflow-hidden" style={{ background: fg + '33' }}>
+            <div className="h-full rounded-full transition-all duration-300" style={{ width: `${aiProgress}%`, background: fg }} />
+          </div>
         )}
       </div>
     )
   }
 
   if (stage === 'result' && config && resultUrl) {
-    const fg = config.secondary_color
     const bg = config.primary_color
+    const fg = config.secondary_color
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
     const claimUrl = photoUrl
-      ? `${typeof window !== 'undefined' ? window.location.origin : ''}/brand-station/claim?url=${encodeURIComponent(photoUrl)}&config=${config.id}&brand=${encodeURIComponent(config.brand_name)}&color=${encodeURIComponent(bg)}`
+      ? `${origin}/brand-station/claim?url=${encodeURIComponent(photoUrl)}&config=${config.id}&brand=${encodeURIComponent(config.brand_name)}&color=${encodeURIComponent(bg)}`
       : ''
     const qrSrc = claimUrl
-      ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&color=000000&bgcolor=ffffff&data=${encodeURIComponent(claimUrl)}`
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&color=000000&bgcolor=ffffff&data=${encodeURIComponent(claimUrl)}`
       : ''
 
     return (
-      <div className="fixed inset-0 flex" style={{ background: '#0a0a0a' }}>
+      <div className="fixed inset-0 flex" style={{ background: '#080808' }}>
         <canvas ref={canvasRef} className="hidden" />
 
-        {/* Branded photo — left 60% */}
-        <div className="flex-1 relative overflow-hidden">
+        {/* Photo — takes most of the screen */}
+        <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={resultUrl} alt="Your branded photo"
-            className="absolute inset-0 w-full h-full object-contain" />
+            className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl" />
         </div>
 
-        {/* Right panel — QR + info */}
-        <div className="w-80 flex flex-col items-center justify-center gap-6 p-8"
+        {/* Right panel */}
+        <div className="w-72 flex flex-col items-center justify-between py-8 px-6"
           style={{ background: bg }}>
-          {config.logo_data_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={config.logo_data_url} alt={config.brand_name}
-              className="w-32 h-20 object-contain" />
-          )}
-
-          <div className="text-center" style={{ color: fg }}>
-            <p className="text-2xl font-black">{config.brand_name}</p>
-            {config.tagline && <p className="text-sm mt-1 opacity-70">{config.tagline}</p>}
-          </div>
-
-          <div className="bg-white rounded-2xl p-3 shadow-2xl">
-            {qrSrc ? (
+          <div className="flex flex-col items-center gap-4">
+            {config.logo_data_url && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={qrSrc} alt="Scan QR" width={200} height={200} />
-            ) : (
-              <div className="w-[200px] h-[200px] flex items-center justify-center">
-                <Loader2 size={32} className="animate-spin text-gray-400" />
-              </div>
+              <img src={config.logo_data_url} alt="" className="w-32 h-20 object-contain" />
             )}
-          </div>
-
-          <div className="text-center" style={{ color: fg }}>
-            <p className="text-lg font-bold">📱 Scan to get your photo</p>
-            <p className="text-sm opacity-70 mt-1">Enter your WhatsApp number</p>
-          </div>
-
-          <div className="w-full mt-auto">
-            <div className="text-center mb-3">
-              <span className="text-sm font-medium" style={{ color: fg, opacity: 0.5 }}>
-                New photo in {resetTimer}s
-              </span>
+            <div className="text-center">
+              <p className="text-xl font-black" style={{ color: fg }}>{config.brand_name}</p>
+              {config.tagline && <p className="text-sm mt-1 opacity-65" style={{ color: fg }}>{config.tagline}</p>}
             </div>
+          </div>
+
+          <div className="flex flex-col items-center gap-4">
+            <div className="bg-white rounded-2xl p-3 shadow-xl">
+              {qrSrc
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={qrSrc} alt="Scan" width={210} height={210} />
+                : <div className="w-[210px] h-[210px] flex items-center justify-center"><Loader2 size={28} className="animate-spin text-gray-400" /></div>}
+            </div>
+            <div className="text-center" style={{ color: fg }}>
+              <p className="text-lg font-bold">📱 Scan to get your photo</p>
+              <p className="text-xs mt-1 opacity-60">Enter WhatsApp to receive it</p>
+            </div>
+          </div>
+
+          <div className="w-full space-y-2">
+            <p className="text-center text-xs opacity-40" style={{ color: fg }}>New photo in {resetTimer}s</p>
             <button onClick={resetToAttract}
               className="w-full py-3.5 rounded-2xl font-bold text-sm transition-all active:scale-95"
-              style={{ background: fg + '22', color: fg, border: `1px solid ${fg}44` }}>
+              style={{ background: fg + '1a', color: fg, border: `1.5px solid ${fg}44` }}>
               ↩ Take Another Photo
             </button>
           </div>
@@ -498,14 +471,4 @@ export default function BrandStation() {
   }
 
   return null
-}
-
-// Darken/lighten a hex color by amount
-function adjustColor(hex: string, amount: number): string {
-  const clean = hex.replace('#', '')
-  if (clean.length !== 6) return hex
-  const r = Math.max(0, Math.min(255, parseInt(clean.slice(0, 2), 16) + amount))
-  const g = Math.max(0, Math.min(255, parseInt(clean.slice(2, 4), 16) + amount))
-  const b = Math.max(0, Math.min(255, parseInt(clean.slice(4, 6), 16) + amount))
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
 }

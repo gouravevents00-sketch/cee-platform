@@ -4,6 +4,7 @@ import Link from 'next/link'
 import {
   Plus, ClipboardList, Zap, PenLine, Bot, Layers,
   Camera, RotateCw, Sparkles, Maximize2, Megaphone, Smartphone, LayoutGrid,
+  Settings,
 } from 'lucide-react'
 import { EXPERIENCE_SERVICES, ServiceType } from '@/lib/types'
 
@@ -21,6 +22,12 @@ const SERVICE_ICONS: Record<ServiceType, React.ElementType> = {
   mosaic_wall: LayoutGrid,
 }
 
+// Services that have a digital operator panel built out
+const OPERATOR_PANEL: Partial<Record<ServiceType, string>> = {
+  photo_booth: '/dashboard/experiences/booth',
+  brand_activation: '/dashboard/experiences/brand-activation',
+}
+
 export default async function ExperiencesPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -29,7 +36,7 @@ export default async function ExperiencesPage() {
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
   if (!profile) redirect('/login')
 
-  const canBook = profile.role === 'director' || profile.role === 'admin'
+  const isDirector = profile.role === 'director' || profile.role === 'admin'
 
   const { count } = await supabase
     .from('experience_orders')
@@ -45,29 +52,13 @@ export default async function ExperiencesPage() {
         </div>
         <div className="flex items-center gap-3">
           <Link
-            href="/dashboard/experiences/booth"
-            className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium px-4 py-2.5 rounded-xl text-sm transition-colors"
-          >
-            <Camera size={16} />
-            Photo Booth
-          </Link>
-          {canBook && (
-            <Link
-              href="/dashboard/experiences/brand-activation"
-              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium px-4 py-2.5 rounded-xl text-sm transition-colors"
-            >
-              <Megaphone size={16} />
-              Brand Activation
-            </Link>
-          )}
-          <Link
             href="/dashboard/experiences/orders"
             className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium px-4 py-2.5 rounded-xl text-sm transition-colors"
           >
             <ClipboardList size={16} />
             Orders{count ? ` (${count})` : ''}
           </Link>
-          {canBook && (
+          {isDirector && (
             <Link
               href="/dashboard/experiences/new"
               className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-black font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors"
@@ -82,6 +73,7 @@ export default async function ExperiencesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {EXPERIENCE_SERVICES.map(service => {
           const Icon = SERVICE_ICONS[service.id]
+          const panelUrl = OPERATOR_PANEL[service.id]
           return (
             <div key={service.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
               <div className="flex items-start gap-3 mb-4">
@@ -89,7 +81,17 @@ export default async function ExperiencesPage() {
                   <Icon size={18} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-white font-semibold">{service.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-white font-semibold">{service.name}</h3>
+                    {panelUrl && isDirector && (
+                      <Link
+                        href={panelUrl}
+                        className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded-full transition-colors"
+                      >
+                        <Settings size={10} /> Operator
+                      </Link>
+                    )}
+                  </div>
                   <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">{service.description}</p>
                 </div>
               </div>
@@ -114,7 +116,7 @@ export default async function ExperiencesPage() {
                 )}
               </div>
 
-              {canBook && (
+              {isDirector && (
                 <Link
                   href={`/dashboard/experiences/new?service=${service.id}`}
                   className="mt-4 block text-center bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-sm font-medium py-2.5 rounded-xl transition-colors"
