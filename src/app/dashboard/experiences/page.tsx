@@ -26,6 +26,7 @@ const SERVICE_ICONS: Record<ServiceType, React.ElementType> = {
 const OPERATOR_PANEL: Partial<Record<ServiceType, string>> = {
   photo_booth: '/dashboard/experiences/booth',
   brand_activation: '/dashboard/experiences/brand-activation',
+  mosaic_wall: '/dashboard/experiences/mosaic-wall',
 }
 
 export default async function ExperiencesPage() {

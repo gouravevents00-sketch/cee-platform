@@ -15,7 +15,12 @@ export async function proxy(request: NextRequest) {
     path.startsWith('/api/booth/') ||
     path === '/brand-station' ||
     path.startsWith('/brand-station/') ||
-    path.startsWith('/api/brand-activation/')
+    path.startsWith('/api/brand-activation/') ||
+    path === '/mosaic-capture' ||
+    path.startsWith('/mosaic-capture/') ||
+    path === '/mosaic-display' ||
+    path.startsWith('/mosaic-display/') ||
+    path.startsWith('/api/mosaic/')
 
   if (isPublicPage) return NextResponse.next()
 
