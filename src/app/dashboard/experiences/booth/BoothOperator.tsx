@@ -1,26 +1,37 @@
 'use client'
 
-import { useState } from 'react'
-import { Camera, ExternalLink, Info, Zap, Wifi, WifiOff } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Camera, ExternalLink, Info, Zap, Wifi, Settings, RefreshCw } from 'lucide-react'
+import Link from 'next/link'
 
 type EventType = 'corporate' | 'wedding' | 'party' | 'brand'
 
-const FILTER_INFO = [
-  { emoji: '📸', name: 'Original',  note: 'Instant — no AI' },
-  { emoji: '🎬', name: 'Bollywood', note: '~5–8s — fal.ai' },
-  { emoji: '🎨', name: 'Cartoon',   note: '~5–8s — fal.ai' },
-  { emoji: '🖼️', name: 'Painting',  note: '~5–8s — fal.ai' },
-  { emoji: '✏️', name: 'Sketch',    note: '~5–8s — fal.ai' },
-]
+interface DBFilter {
+  id: string
+  name: string
+  emoji: string
+  description: string
+}
 
-export default function BoothOperator() {
+export default function BoothOperator({ isDirector }: { isDirector?: boolean }) {
   const [eventName, setEventName] = useState('')
   const [eventType, setEventType] = useState<EventType>('corporate')
+  const [brandContext, setBrandContext] = useState('')
+  const [filters, setFilters] = useState<DBFilter[]>([])
+  const [loadingFilters, setLoadingFilters] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/booth/filters')
+      .then(r => r.json())
+      .then(d => setFilters(d.filters ?? []))
+      .finally(() => setLoadingFilters(false))
+  }, [])
 
   function launchBooth() {
     const params = new URLSearchParams()
     if (eventName) params.set('event', eventName)
     params.set('type', eventType)
+    if (brandContext.trim()) params.set('brand', brandContext.trim())
     window.open(`/booth?${params.toString()}`, '_blank', 'noopener,noreferrer')
   }
 
@@ -50,6 +61,19 @@ export default function BoothOperator() {
               className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 placeholder-gray-600"
             />
           </div>
+
+          <div>
+            <label className="text-gray-400 text-xs font-medium block mb-1.5">Brand / Theme Context</label>
+            <input
+              type="text"
+              value={brandContext}
+              onChange={e => setBrandContext(e.target.value)}
+              placeholder="e.g. BJP rally, HDFC blue branding, Holi celebration"
+              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 placeholder-gray-600"
+            />
+            <p className="text-gray-600 text-xs mt-1">This gets added to every AI prompt automatically</p>
+          </div>
+
           <div>
             <label className="text-gray-400 text-xs font-medium block mb-1.5">Event Type</label>
             <div className="grid grid-cols-4 gap-2">
@@ -63,7 +87,7 @@ export default function BoothOperator() {
                       : 'bg-gray-800 border border-gray-700 text-gray-400 hover:border-gray-500'
                   }`}
                 >
-                  {t === 'brand' ? 'Brand' : t.charAt(0).toUpperCase() + t.slice(1)}
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
                 </button>
               ))}
             </div>
@@ -83,23 +107,70 @@ export default function BoothOperator() {
         </p>
       </div>
 
-      {/* AI Filters */}
+      {/* AI Filters — live from DB */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Zap size={15} className="text-amber-400" />
-          <h3 className="text-white font-semibold text-sm">Available Filters</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Zap size={15} className="text-amber-400" />
+            <h3 className="text-white font-semibold text-sm">Active AI Styles</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            {isDirector && (
+              <Link
+                href="/dashboard/experiences/booth/filters"
+                className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 transition-colors bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 rounded-lg"
+              >
+                <Settings size={12} />
+                Manage Styles
+              </Link>
+            )}
+            <button
+              onClick={() => {
+                setLoadingFilters(true)
+                fetch('/api/booth/filters')
+                  .then(r => r.json())
+                  .then(d => setFilters(d.filters ?? []))
+                  .finally(() => setLoadingFilters(false))
+              }}
+              className="p-1.5 text-gray-600 hover:text-gray-300 transition-colors"
+              title="Refresh"
+            >
+              <RefreshCw size={13} className={loadingFilters ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
-        <div className="space-y-2">
-          {FILTER_INFO.map(f => (
-            <div key={f.name} className="flex items-center justify-between bg-gray-800 rounded-xl px-3 py-2.5">
-              <div className="flex items-center gap-2.5">
-                <span className="text-lg">{f.emoji}</span>
-                <span className="text-white text-sm font-medium">{f.name}</span>
+
+        {loadingFilters ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-10 bg-gray-800 rounded-xl animate-pulse" />
+            ))}
+          </div>
+        ) : filters.length === 0 ? (
+          <div className="text-center py-6">
+            <p className="text-gray-500 text-sm">No active styles found.</p>
+            {isDirector && (
+              <Link href="/dashboard/experiences/booth/filters" className="text-amber-400 text-sm mt-1 hover:text-amber-300 block">
+                Add styles in Filter Manager →
+              </Link>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filters.map(f => (
+              <div key={f.id} className="flex items-center justify-between bg-gray-800 rounded-xl px-3 py-2.5">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-lg">{f.emoji}</span>
+                  <div>
+                    <span className="text-white text-sm font-medium">{f.name}</span>
+                    {f.description && <p className="text-gray-500 text-xs">{f.description}</p>}
+                  </div>
+                </div>
+                <span className="text-gray-500 text-xs">~5–8s</span>
               </div>
-              <span className="text-gray-500 text-xs">{f.note}</span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Requirements */}
@@ -115,7 +186,7 @@ export default function BoothOperator() {
             </div>
             <div>
               <p className="text-white text-sm font-medium">Internet Required for AI Filters</p>
-              <p className="text-gray-500 text-xs mt-0.5">Original filter works offline. Bollywood/Cartoon/Painting/Sketch need internet (fal.ai API)</p>
+              <p className="text-gray-500 text-xs mt-0.5">All AI styles use fal.ai API — need stable internet at venue</p>
             </div>
           </div>
           <div className="flex items-start gap-3">
@@ -124,16 +195,16 @@ export default function BoothOperator() {
             </div>
             <div>
               <p className="text-white text-sm font-medium">Camera Permission</p>
-              <p className="text-gray-500 text-xs mt-0.5">Allow camera access in browser when prompted. Works best on iPad/laptop with front camera</p>
+              <p className="text-gray-500 text-xs mt-0.5">Allow camera access when prompted. Works best on iPad or laptop with front camera</p>
             </div>
           </div>
           <div className="flex items-start gap-3">
             <div className="w-6 h-6 rounded-lg bg-orange-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <WifiOff size={12} className="text-orange-400" />
+              <span className="text-orange-400 text-xs font-bold">QR</span>
             </div>
             <div>
-              <p className="text-white text-sm font-medium">WhatsApp Sharing</p>
-              <p className="text-gray-500 text-xs mt-0.5">Opens WhatsApp with pre-filled message + photo URL. Guest sends to themselves</p>
+              <p className="text-white text-sm font-medium">Guest Claims Photo via QR</p>
+              <p className="text-gray-500 text-xs mt-0.5">After AI transforms photo, a QR appears. Guest scans on their phone → fills name + WhatsApp → gets photo sent</p>
             </div>
           </div>
         </div>
@@ -148,12 +219,12 @@ export default function BoothOperator() {
             <span className="text-white">~₹1.50–3</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">WhatsApp message (MSG91)</span>
-            <span className="text-white">₹0.20–0.50</span>
+            <span className="text-gray-500">WhatsApp (guest self-sends)</span>
+            <span className="text-white">₹0</span>
           </div>
           <div className="border-t border-gray-800 pt-2 flex justify-between font-medium">
             <span className="text-gray-400">200 guests (avg event)</span>
-            <span className="text-amber-400">~₹400–700</span>
+            <span className="text-amber-400">~₹300–600</span>
           </div>
         </div>
       </div>

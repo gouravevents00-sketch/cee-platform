@@ -29,7 +29,7 @@ export default async function BoothOperatorPage() {
         <h1 className="text-white font-semibold">AI Photo Booth — Operator</h1>
       </div>
 
-      <BoothOperator />
+      <BoothOperator isDirector={profile.role === 'director' || profile.role === 'admin'} />
     </div>
   )
 }
