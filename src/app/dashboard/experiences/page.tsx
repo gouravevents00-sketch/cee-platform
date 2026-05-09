@@ -51,6 +51,15 @@ export default async function ExperiencesPage() {
             <Camera size={16} />
             Photo Booth
           </Link>
+          {canBook && (
+            <Link
+              href="/dashboard/experiences/brand-activation"
+              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium px-4 py-2.5 rounded-xl text-sm transition-colors"
+            >
+              <Megaphone size={16} />
+              Brand Activation
+            </Link>
+          )}
           <Link
             href="/dashboard/experiences/orders"
             className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium px-4 py-2.5 rounded-xl text-sm transition-colors"

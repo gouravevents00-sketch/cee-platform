@@ -12,7 +12,10 @@ export async function proxy(request: NextRequest) {
     path.startsWith('/portal/') ||
     path === '/booth' ||
     path.startsWith('/booth/') ||
-    path.startsWith('/api/booth/')
+    path.startsWith('/api/booth/') ||
+    path === '/brand-station' ||
+    path.startsWith('/brand-station/') ||
+    path.startsWith('/api/brand-activation/')
 
   if (isPublicPage) return NextResponse.next()
 
